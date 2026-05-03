@@ -1,0 +1,28 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+# ... existing standard python gitignore items ...
+
+# Environment variables
+.env
+
+# User data
+schedule.txt
+
+# Local audio cache/music
+*.mp3
+*.wav
+*.mp4
+*.m4a
+*.webm
+jarvis_music_*
+
+# IDEs
+.vscode/
+.idea/

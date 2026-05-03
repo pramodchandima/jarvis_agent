@@ -1,0 +1,10 @@
+groq
+rich
+python-dotenv
+pygame
+SpeechRecognition
+edge-tts
+PyAudio
+openai-whisper
+google-api-python-client
+yt-dlp
