@@ -15,55 +15,52 @@ from core.database import get_db_stats
 # Track the spawned dashboard process
 dashboard_process: Optional[subprocess.Popen] = None
 
-# Global cache for OpenSky flights to bypass browser CORS limits and respect API rate limits
-opensky_cache = []
-last_opensky_fetch = 0.0
+# Global cache for FlightRadar24 flights
+flight_cache = []
+last_flight_fetch = 0.0
 
-def fetch_opensky_flights():
-    """Fetch OpenSky flights using Python standard library (no CORS limits)"""
-    global opensky_cache, last_opensky_fetch
+def fetch_flightradar_flights():
+    """Fetch FlightRadar24 flights for Badulla bounds (CORS-proof)"""
+    global flight_cache, last_flight_fetch
     now = time.time()
-    # Cache and pull once every 60 seconds to avoid 429 rate limits
-    if now - last_opensky_fetch < 60:
-        return opensky_cache
+    # Cache and pull once every 20 seconds
+    if now - last_flight_fetch < 20:
+        return flight_cache
         
     try:
-        url = "https://opensky-network.org/api/states/all?lamin=3.5&lamax=12.3&lomin=76.3&lomax=85.1"
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        # Badulla bounds: North=8.5, South=5.5, West=79.5, East=82.5
+        url = "https://data-live.flightradar24.com/zones/fcgi/feed.js?bounds=8.50,5.50,79.50,82.50&adsb=1&air=1"
+        req = urllib.request.Request(url, headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "application/json"
+        })
         with urllib.request.urlopen(req, timeout=12) as response:
             res_data = json.loads(response.read().decode('utf-8'))
-            states = res_data.get("states")
-            if states:
-                temp_list = []
-                for s in states:
-                    icao24 = s[0]
-                    callsign = (s[1] or "").strip() or "N/A"
-                    lon = s[5]
-                    lat = s[6]
-                    if lon is None or lat is None:
-                        continue
+            temp_list = []
+            for key, val in res_data.items():
+                if key in ("full_count", "version"):
+                    continue
+                if isinstance(val, list) and len(val) > 13:
                     temp_list.append({
-                        "icao24": icao24,
-                        "callsign": callsign,
-                        "country": f"ORIG: {s[2] or 'N/A'}",
-                        "longitude": lon,
-                        "latitude": lat,
-                        "altitude": round(s[7] or 0),
-                        "speed": round((s[9] or 0) * 3.6), # Convert m/s to km/h
-                        "track": s[10] or 0,
-                        # Defaults for OpenSky state limits
+                        "icao24": val[0],
+                        "callsign": (val[16] or "").strip() or "N/A",
+                        "country": f"ORIG: {val[11] or 'N/A'}",
+                        "longitude": val[2],
+                        "latitude": val[1],
+                        "altitude": round(val[4]) if val[4] is not None else 0,
+                        "speed": round(val[5] * 1.852) if val[5] is not None else 0, # Convert knots to km/h
+                        "track": val[3] or 0,
                         "emergency": "none",
                         "mach": "N/A",
                         "temp": "N/A",
                         "wind": "N/A",
                         "mcpAlt": "N/A"
                     })
-                opensky_cache = temp_list
-                last_opensky_fetch = now
+            flight_cache = temp_list
+            last_flight_fetch = now
     except Exception:
-        # Silently fail and use previous cached list on temporary errors/rate limits
         pass
-    return opensky_cache
+    return flight_cache
 
 def update_dashboard_data():
     """Build and write the current schedule and system variables to data.js"""
@@ -85,8 +82,8 @@ def update_dashboard_data():
     # Get database metrics
     mems, convs, skills = get_db_stats()
     
-    # Get OpenSky flights via Python backend (CORS-proof)
-    opensky_flights = fetch_opensky_flights()
+    # Get FlightRadar24 flights via Python backend (CORS-proof)
+    radar_flights = fetch_flightradar_flights()
     
     # Build package
     data = {
@@ -94,7 +91,7 @@ def update_dashboard_data():
         "db_memories": mems,
         "db_conversations": convs,
         "db_skills": skills,
-        "opensky_flights": opensky_flights
+        "opensky_flights": radar_flights
     }
     
     try:

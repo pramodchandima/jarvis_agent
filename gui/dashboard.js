@@ -44,8 +44,8 @@ function formatTimeString(isoString) {
 // Fetch 14 Weather & Air Quality parameters
 async function fetchLiveWeather() {
     try {
-        const weatherUrl = "https://api.open-meteo.com/v1/forecast?latitude=6.9271&longitude=79.8612&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,surface_pressure,dew_point_2m&daily=sunrise,sunset,uv_index_max,precipitation_probability_max&timezone=auto";
-        const airUrl = "https://air-quality-api.open-meteo.com/v1/air-quality?latitude=6.9271&longitude=79.8612&current=pm2_5,ozone";
+        const weatherUrl = "https://api.open-meteo.com/v1/forecast?latitude=6.9934&longitude=81.0550&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,surface_pressure,dew_point_2m&daily=sunrise,sunset,uv_index_max,precipitation_probability_max&timezone=auto";
+        const airUrl = "https://air-quality-api.open-meteo.com/v1/air-quality?latitude=6.9934&longitude=81.0550&current=pm2_5,ozone";
         
         const [weatherRes, airRes] = await Promise.all([
             fetch(weatherUrl),
@@ -332,10 +332,10 @@ function drawRadar() {
     // 2b. Draw geographical sectors
     ctx.fillStyle = 'rgba(0, 243, 255, 0.15)';
     ctx.font = '8px "Share Tech Mono"';
-    ctx.fillText("IND / CHENNAI FIR", cx - maxRadius + 15, cy - maxRadius + 20);
-    ctx.fillText("COLOMBO FIR (CORE)", cx + 15, cy - 10);
-    ctx.fillText("MALDIVES FIR", cx - maxRadius + 15, cy + maxRadius - 15);
-    ctx.fillText("IND OCEAN SECTOR", cx + maxRadius - 95, cy + maxRadius - 15);
+    ctx.fillText("N-EAST ZONE", cx - maxRadius + 15, cy - maxRadius + 20);
+    ctx.fillText("BADULLA SECTOR (ACTIVE)", cx + 15, cy - 10);
+    ctx.fillText("S-WEST ZONE", cx - maxRadius + 15, cy + maxRadius - 15);
+    ctx.fillText("S-EAST ZONE", cx + maxRadius - 95, cy + maxRadius - 15);
     
     // 3. Draw radar sweep line
     ctx.save();
@@ -360,10 +360,10 @@ function drawRadar() {
         
         flightsList.forEach((flight, idx) => {
             // Map GPS coords to canvas layout bounds relative to Bounding Box
-            const lonMin = 76.3;
-            const lonMax = 85.1;
-            const latMin = 3.5;
-            const latMax = 12.3;
+            const lonMin = 79.5;
+            const lonMax = 82.5;
+            const latMin = 5.5;
+            const latMax = 8.5;
             
             const px = ((flight.longitude - lonMin) / (lonMax - lonMin)) * (maxRadius * 2) + (cx - maxRadius);
             const py = (1.0 - (flight.latitude - latMin) / (latMax - latMin)) * (maxRadius * 2) + (cy - maxRadius);
