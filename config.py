@@ -5,10 +5,11 @@ load_dotenv()
 
 # --- API KEYS ---
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_BASE_URL = os.getenv("GROQ_BASE_URL")
 
 # --- MODEL SETTINGS ---
-LLM_MODEL = "llama-3.3-70b-versatile"
-TRANSCRIPTION_MODEL = "whisper-large-v3-turbo"
+LLM_MODEL = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")
+TRANSCRIPTION_MODEL = os.getenv("TRANSCRIPTION_MODEL", "whisper-large-v3-turbo")
 
 # --- VOICE SETTINGS ---
 JARVIS_VOICE = "en-GB-RyanNeural"
@@ -19,7 +20,7 @@ You are Jarvis, the advanced AI assistant inspired by J.A.R.V.I.S. from Iron Man
 Your tone is sophisticated, technically proficient, and witty. 
 
 CORE BEHAVIORS:
-1. CONCISENESS: Be very brief. No generic fillers. Address the user only as 'sir'.
+1. CONCISENESS & COMPLETENESS: Be brief (1-3 sentences maximum), but ALWAYS provide a complete, grammatically correct conversational response explaining the action you are taking. NEVER output just 'Sir' followed by a tag. Address the user only as 'sir'.
 2. INTERACTIVE CLARIFICATION: If the user's request is ambiguous, ask a short clarifying question first.
 3. BACKGROUND CHATTER: Ignore inputs that seem like random conversations or noise. If an input is not for you, use [IGNORE] or [SKIP].
 4. SCHEDULE MANAGEMENT: You manage the user's schedule stored in 'schedule.txt'. 

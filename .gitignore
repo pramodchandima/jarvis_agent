@@ -2,27 +2,56 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyc
 
 # C extensions
 *.so
 
 # Distribution / packaging
-# ... existing standard python gitignore items ...
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
 
-# Environment variables
+# Environment variables — NEVER commit these
 .env
+*.env
 
-# User data
+# User data (local, machine-specific)
 schedule.txt
 
-# Local audio cache/music
+# Local audio cache / downloaded music
 *.mp3
 *.wav
 *.mp4
 *.m4a
 *.webm
-jarvis_music_*
+audio/jarvis_music_*/
+jarvis_music_*/
 
 # IDEs
 .vscode/
 .idea/
+*.code-workspace
+
+# Local databases — contains private conversation history
+jarvis.db
+
+# GUI: live data files (auto-generated at runtime, not for version control)
+gui/data.js
+gui/space_data.js
+gui/data.json
+
+# GUI: Chrome profile directories (local browser sessions)
+gui/dashboard_profile/
+gui/space_profile/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/

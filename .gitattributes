@@ -1,0 +1,25 @@
+# Normalize line endings to LF in repository (cross-platform consistency)
+* text=auto eol=lf
+
+# Force binary for media files
+*.mp3 binary
+*.wav binary
+*.mp4 binary
+*.webm binary
+*.png binary
+*.jpg binary
+*.ico binary
+
+# Python source — always LF
+*.py text eol=lf
+
+# Web source — always LF
+*.html text eol=lf
+*.css  text eol=lf
+*.js   text eol=lf
+*.json text eol=lf
+
+# Config / docs — always LF
+*.md   text eol=lf
+*.txt  text eol=lf
+*.env  text eol=lf

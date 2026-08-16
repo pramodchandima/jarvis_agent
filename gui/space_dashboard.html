@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>J.A.R.V.I.S. Orbital Telemetry Core</title>
+    <link rel="stylesheet" href="space_dashboard.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="scanlines"></div>
+    <div class="main-terminal">
+        <!-- Header -->
+        <div class="terminal-header">
+            <div class="status-indicator">
+                <span class="pulse-ring"></span>
+                <span class="hud-title">J.A.R.V.I.S. // ORBITAL TELEMETRY CORE</span>
+            </div>
+            <div class="header-right">
+                <div class="header-badge" id="quake-alert-badge" style="display:none;">⚠ SEISMIC ALERT</div>
+                <div class="timezone-hud" id="timezone-lbl">UTC</div>
+            </div>
+        </div>
+
+        <!-- Layout Grid -->
+        <div class="hud-grid">
+            
+            <!-- Left Column -->
+            <div class="grid-col left-sidebar">
+
+                <!-- 01: NASA APOD -->
+                <div class="card tech-card apod-card">
+                    <div class="tech-corner tl"></div><div class="tech-corner tr"></div>
+                    <div class="hud-num">01</div>
+                    <div class="hud-lbl">// NASA ASTRONOMY PICTURE OF THE DAY</div>
+                    <div class="apod-body">
+                        <div class="apod-title" id="apod-title">LOADING...</div>
+                        <div class="apod-desc" id="apod-desc">Fetching cosmic data...</div>
+                        <div class="apod-copyright" id="apod-copyright"></div>
+                    </div>
+                </div>
+
+                <!-- 02: Space Crew Registry -->
+                <div class="card tech-card crew-card">
+                    <div class="hud-num">02</div>
+                    <div class="hud-lbl">// ORBITAL CREW REGISTRY</div>
+                    <div class="crew-list" id="crew-list">
+                        <div class="crew-item empty">LOADING REGISTRY...</div>
+                    </div>
+                </div>
+
+                <!-- 03: Space Storm Scales -->
+                <div class="card tech-card storm-card">
+                    <div class="hud-num">03</div>
+                    <div class="hud-lbl">// NOAA SPACE WEATHER ALERT STATUS</div>
+                    <div class="storm-stats">
+                        <div class="storm-row">
+                            <span class="storm-lbl">GEOMAGNETIC (G):</span>
+                            <span class="storm-val" id="geomagnetic-lbl">G0 - NORMAL</span>
+                        </div>
+                        <div class="storm-row">
+                            <span class="storm-lbl">SOLAR RADIATION (S):</span>
+                            <span class="storm-val" id="radiation-lbl">S0 - NORMAL</span>
+                        </div>
+                        <div class="storm-row">
+                            <span class="storm-lbl">RADIO BLACKOUT (R):</span>
+                            <span class="storm-val" id="radio-lbl">R0 - NORMAL</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 04: Solar Flux Core -->
+                <div class="card tech-card solar-card">
+                    <div class="tech-corner bl"></div><div class="tech-corner br"></div>
+                    <div class="hud-num">04</div>
+                    <div class="hud-lbl">// SOLAR WIND CORE</div>
+                    <div class="solar-stats">
+                        <div class="solar-row">
+                            <span class="solar-lbl">SOLAR WIND SPEED:</span>
+                            <span class="solar-val" id="wind-speed-lbl">-- km/s</span>
+                        </div>
+                        <div class="solar-row">
+                            <span class="solar-lbl">GEOMAGNETIC INDEX:</span>
+                            <span class="solar-val" id="kp-index-lbl">-- Kp</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Center Column -->
+            <div class="grid-col center-stage">
+                <div class="card map-card tech-card">
+                    <div class="tech-corner tl"></div><div class="tech-corner bl"></div><div class="tech-corner tr"></div><div class="tech-corner br"></div>
+                    <div class="hud-lbl">// ISS LIVE ORBITAL MAP PROJECTION</div>
+                    <div class="map-container">
+                        <canvas id="orbit-canvas"></canvas>
+                        <!-- Earthquake markers overlay -->
+                        <div class="quake-overlay" id="quake-overlay"></div>
+                    </div>
+                </div>
+
+                <!-- Bottom: Earthquake Alert Feed -->
+                <div class="card tech-card quake-card">
+                    <div class="tech-corner tl"></div><div class="tech-corner tr"></div>
+                    <div class="hud-num">Q</div>
+                    <div class="hud-lbl">// USGS SEISMIC ACTIVITY FEED — LAST 24H</div>
+                    <div class="quake-list" id="quake-list">
+                        <div class="quake-item empty">SCANNING SEISMIC DATA...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column -->
+            <div class="grid-col right-sidebar">
+
+                <!-- 07: ISS Orbital Telemetry -->
+                <div class="card tech-card telemetry-card">
+                    <div class="hud-num">07</div>
+                    <div class="hud-lbl">// ISS LIVE TELEMETRY CORE</div>
+                    <div class="telemetry-stats">
+                        <div class="tel-row">
+                            <span class="tel-lbl">LATITUDE</span>
+                            <span class="tel-val" id="lat-lbl">--°</span>
+                        </div>
+                        <div class="tel-row">
+                            <span class="tel-lbl">LONGITUDE</span>
+                            <span class="tel-val" id="lon-lbl">--°</span>
+                        </div>
+                        <div class="tel-row">
+                            <span class="tel-lbl">ALTITUDE</span>
+                            <span class="tel-val" id="alt-lbl">-- km</span>
+                        </div>
+                        <div class="tel-row">
+                            <span class="tel-lbl">VELOCITY</span>
+                            <span class="tel-val" id="vel-lbl">-- km/h</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 08: Orbit Environment -->
+                <div class="card tech-card env-card">
+                    <div class="tech-corner bl"></div><div class="tech-corner br"></div>
+                    <div class="hud-num">08</div>
+                    <div class="hud-lbl">// ORBIT ENVIRONMENTAL STATUS</div>
+                    <div class="env-stats">
+                        <div class="env-row">
+                            <span class="env-lbl">LIGHT PHASE:</span>
+                            <span class="env-val" id="phase-lbl">--</span>
+                        </div>
+                        <div class="env-row">
+                            <span class="env-lbl">SOLAR LATITUDE:</span>
+                            <span class="env-val" id="solar-lat-lbl">--°</span>
+                        </div>
+                        <div class="env-row">
+                            <span class="env-lbl">SOLAR LONGITUDE:</span>
+                            <span class="env-val" id="solar-lon-lbl">--°</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 09: Maritime Vessel Tracker -->
+                <div class="card tech-card maritime-card">
+                    <div class="hud-num">09</div>
+                    <div class="hud-lbl">// MARITIME ACTIVITY CORE</div>
+                    <div class="maritime-stats" id="maritime-stats">
+                        <div class="maritime-row">
+                            <span class="maritime-lbl">GLOBAL VESSEL TRAFFIC:</span>
+                            <span class="maritime-val" id="vessel-count-lbl">-- ACTIVE</span>
+                        </div>
+                        <div class="maritime-row">
+                            <span class="maritime-lbl">PIRACY ALERT ZONE:</span>
+                            <span class="maritime-val" id="piracy-lbl">GULF OF ADEN</span>
+                        </div>
+                        <div class="maritime-row">
+                            <span class="maritime-lbl">SUEZ CANAL STATUS:</span>
+                            <span class="maritime-val text-neon" id="suez-lbl">OPERATIONAL</span>
+                        </div>
+                        <div class="maritime-row">
+                            <span class="maritime-lbl">STRAIT OF MALACCA:</span>
+                            <span class="maritime-val text-neon" id="malacca-lbl">CLEAR</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- Bottom Crypto Ticker Bar -->
+        <div class="crypto-ticker-bar">
+            <div class="ticker-label">// GLOBAL FINANCE</div>
+            <div class="ticker-track" id="crypto-ticker-track">
+                <div class="ticker-content" id="crypto-ticker">
+                    <span class="tick-item">BTC <span class="tick-price" id="t-btc">--</span></span>
+                    <span class="tick-sep">◆</span>
+                    <span class="tick-item">ETH <span class="tick-price" id="t-eth">--</span></span>
+                    <span class="tick-sep">◆</span>
+                    <span class="tick-item">BNB <span class="tick-price" id="t-bnb">--</span></span>
+                    <span class="tick-sep">◆</span>
+                    <span class="tick-item">SOL <span class="tick-price" id="t-sol">--</span></span>
+                    <span class="tick-sep">◆</span>
+                    <span class="tick-item">XRP <span class="tick-price" id="t-xrp">--</span></span>
+                    <span class="tick-sep">◆</span>
+                    <span class="tick-item">DOGE <span class="tick-price" id="t-doge">--</span></span>
+                    <span class="tick-sep">◆</span>
+                    <span class="tick-item gold-tick">GOLD <span class="tick-price" id="t-gold">--</span></span>
+                    <span class="tick-sep">◆</span>
+                    <span class="tick-item gold-tick">CRUDE OIL <span class="tick-price" id="t-oil">--</span></span>
+                    <span class="tick-sep">◆</span>
+                    <span class="tick-item">USD/LKR <span class="tick-price" id="t-lkr">--</span></span>
+                    <span class="tick-sep">◆</span>
+                    <span class="tick-item">EUR/USD <span class="tick-price" id="t-eur">--</span></span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Scripts -->
+    <script id="data-script"></script>
+    <script src="space_dashboard.js"></script>
+</body>
+</html>

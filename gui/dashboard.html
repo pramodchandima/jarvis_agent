@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>J.A.R.V.I.S. Control Terminal</title>
+    <link rel="stylesheet" href="dashboard.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="scanlines"></div>
+    <div class="main-terminal">
+        <!-- Header -->
+        <div class="terminal-header">
+            <div class="status-indicator">
+                <span class="pulse-ring"></span>
+                <span class="hud-title">J.A.R.V.I.S. // AI COGNITIVE NETWORK</span>
+            </div>
+            <div class="timezone-hud" id="timezone-lbl">UTC</div>
+        </div>
+
+        <!-- Futuristic Asymmetric Grid Layout -->
+        <div class="hud-grid">
+            
+            <!-- Left Column: Chrono, Schedule, Health, Database -->
+            <div class="grid-col left-sidebar">
+                
+                <!-- 01: Chrono -->
+                <div class="card tech-card time-card">
+                    <div class="tech-corner tl"></div><div class="tech-corner tr"></div>
+                    <div class="hud-num">01</div>
+                    <div class="hud-lbl">// SYSTEM CHRONO</div>
+                    <div class="time-display-group">
+                        <div class="digital-time" id="clock-lbl">00:00:00</div>
+                        <div class="digital-date" id="date-lbl">Loading...</div>
+                    </div>
+                </div>
+
+                <!-- 02: Active Protocols -->
+                <div class="card tech-card schedule-card">
+                    <div class="hud-num">02</div>
+                    <div class="hud-lbl">// ACTIVE PROTOCOLS (SCHEDULE)</div>
+                    <div class="schedule-list" id="schedule-list">
+                        <div class="schedule-item empty">Loading...</div>
+                    </div>
+                </div>
+
+                <!-- 03: System Health -->
+                <div class="card tech-card health-card">
+                    <div class="hud-num">03</div>
+                    <div class="hud-lbl">// CORES LOAD & SYSTEM HEALTH</div>
+                    <div class="health-stats">
+                        <div class="health-row">
+                            <span class="health-lbl">CPU ARCH:</span>
+                            <span class="health-val text-neon">12 CORES ONLINE</span>
+                        </div>
+                        <div class="health-row">
+                            <span class="health-lbl">AUDIO FEED:</span>
+                            <span class="health-val text-neon">PYGAME MIXER ACTIVE</span>
+                        </div>
+                        <div class="health-row">
+                            <span class="health-lbl">NEURAL LINK:</span>
+                            <span class="health-val text-neon">GROQ CLOUD STABLE</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 04: Data Recall -->
+                <div class="card tech-card recall-card" id="db-stats-group">
+                    <div class="tech-corner bl"></div><div class="tech-corner br"></div>
+                    <div class="hud-num">04</div>
+                    <div class="hud-lbl">// MEMORIES & DATA RECALL</div>
+                    <div class="db-stats">
+                        <div class="db-row">
+                            <span class="db-lbl">MEMORY BANKS:</span>
+                            <span class="db-val" id="db-mem-lbl">0</span>
+                        </div>
+                        <div class="db-row">
+                            <span class="db-lbl">CONVERSATION LOGS:</span>
+                            <span class="db-val" id="db-log-lbl">0</span>
+                        </div>
+                        <div class="db-row">
+                            <span class="db-lbl">DYNAMICS SKILLS:</span>
+                            <span class="db-val" id="db-skill-lbl">0</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Center Column: Active Airspace Radar Grid -->
+            <div class="grid-col center-stage">
+                <div class="card radar-card tech-card">
+                    <div class="tech-corner tl"></div><div class="tech-corner bl"></div><div class="tech-corner tr"></div><div class="tech-corner br"></div>
+                    <div class="hud-lbl">// ACTIVE AIRSPACE RADAR MAP</div>
+                    <div class="radar-container">
+                        <canvas id="radar-canvas"></canvas>
+                        <div class="flight-details-panel" id="flight-details-list">
+                            <div class="flight-detail-item empty">SCANNING AIRSPACE...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Environmental Stats & Meteorological Core -->
+            <div class="grid-col right-sidebar">
+                
+                <!-- 05: Meteorological Weather Core (Moved here!) -->
+                <div class="card weather-core tech-card">
+                    <div class="tech-corner tl"></div><div class="tech-corner tr"></div>
+                    <div class="hud-num">05</div>
+                    <div class="hud-lbl">// METEOROLOGICAL PROFILE</div>
+                    <div class="core-body">
+                        <div class="core-radar-ring">
+                            <div class="radar-sweep"></div>
+                            <div class="weather-anim-container" id="weather-anim">
+                                <div class="sun-glow"></div>
+                            </div>
+                        </div>
+                        <div class="core-data">
+                            <div class="temperature-val" id="temp-lbl">--°C</div>
+                            <div class="weather-status-text" id="weather-desc-lbl">Locating...</div>
+                        </div>
+                        <!-- Embedded Feels Like & Dewpoint -->
+                        <div class="mini-thermal-stats">
+                            <div class="stat-row">
+                                <span class="stat-lbl">FEELS LIKE:</span>
+                                <span class="stat-val" id="feels-lbl">--°C</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-lbl">DEWPOINT:</span>
+                                <span class="stat-val" id="dewpoint-lbl">--°C</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 06: Atmosphere Profile -->
+                <div class="card tech-card stat-card">
+                    <div class="hud-num">06</div>
+                    <div class="hud-lbl">// ATMOSPHERE PROFILE</div>
+                    <div class="stat-rows">
+                        <div class="stat-row">
+                            <span class="stat-lbl">HUMIDITY</span>
+                            <span class="stat-val" id="humidity-lbl">--%</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-lbl">PRESSURE</span>
+                            <span class="stat-val" id="pressure-lbl">-- hPa</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-lbl">CLOUD COVER</span>
+                            <span class="stat-val" id="clouds-lbl">--%</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-lbl">RAIN PROB.</span>
+                            <span class="stat-val" id="rain-prob-lbl">--%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 07: Wind Profile -->
+                <div class="card tech-card stat-card">
+                    <div class="hud-num">07</div>
+                    <div class="hud-lbl">// WIND PROFILE</div>
+                    <div class="stat-rows">
+                        <div class="stat-row">
+                            <span class="stat-lbl">VELOCITY</span>
+                            <span class="stat-val" id="wind-lbl">-- km/h</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-lbl">DIRECTION</span>
+                            <span class="stat-val" id="wind-dir-lbl">--°</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 08: Air & Biosphere -->
+                <div class="card tech-card stat-card">
+                    <div class="tech-corner bl"></div><div class="tech-corner br"></div>
+                    <div class="hud-num">08</div>
+                    <div class="hud-lbl">// BIOSPHERE PROFILE</div>
+                    <div class="stat-rows">
+                        <div class="stat-row">
+                            <span class="stat-lbl">PM2.5 AQI</span>
+                            <span class="stat-val" id="pm25-lbl">-- µg/m³</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-lbl">OZONE (O₃)</span>
+                            <span class="stat-val" id="ozone-lbl">-- µg/m³</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-lbl">UV INDEX</span>
+                            <span class="stat-val" id="uv-lbl">--</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-lbl">SOLAR TRANSIT</span>
+                            <span class="stat-val" id="sun-times-lbl">-- / --</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+    <script src="dashboard.js"></script>
+</body>
+</html>
