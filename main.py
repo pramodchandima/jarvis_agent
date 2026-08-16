@@ -133,14 +133,29 @@ async def main():
     console.print("[bold white]Note:[/] You can speak or type at any time. To type, just type your query and press Enter.\n")
     threading.Thread(target=console_input_thread, daemon=True).start()
 
+    # Play greeting immediately so user gets feedback instantly
+    greeting = "Online and ready, sir."
+    await speak_jarvis(greeting)
+
     # Define background audio listener callback
     def audio_callback(rec, audio):
         # Only queue voice if Jarvis is not actively speaking or processing
-        if not jarvis_is_speaking:
-            input_queue.put(("voice", audio))
+        is_speaking = getattr(config, 'is_speaking', False) or jarvis_is_speaking
+        last_speak_time = getattr(config, 'last_speak_time', 0.0)
+        import time
+        
+        # Discard audio if speaking now, or if it has been less than 1.5 seconds since speech finished
+        if is_speaking or (time.time() - last_speak_time < 1.5):
+            return
+            
+        input_queue.put(("voice", audio))
 
     stop_listening = None
     if has_mic and microphone:
+        # Calibrate to ambient noise to set the threshold dynamically above background noise
+        with console.status("[yellow]Calibrating microphone to room noise...[/]"):
+            with microphone as source:
+                recognizer.adjust_for_ambient_noise(source, duration=1.0)
         # Start listening in background (runs continuously)
         stop_listening = recognizer.listen_in_background(microphone, audio_callback)
 
@@ -148,13 +163,6 @@ async def main():
     scheduler_task = asyncio.create_task(start_reminder_scheduler())
     # Start background dashboard updater
     dashboard_updater = asyncio.create_task(dashboard_data_writer_task())
-
-    greeting = (
-        "Mainframe online. Voice and text channels are stable. "
-        "All protocols are green... Good to see you sir. What is our first directive?"
-    )
-
-    await speak_jarvis(greeting)
 
     while True:
         try:

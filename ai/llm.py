@@ -9,7 +9,7 @@ from rich.panel import Panel
 from core.config_manager import config
 from core.types import RequestComplexity
 from core.ui import console
-from core.database import log_conversation, add_memory, search_memories, get_recent_conversations
+from core.database import log_conversation, add_memory, search_memories, get_recent_conversations, get_all_skills
 from tools.schedule import load_schedule, save_schedule
 from tools.skill_manager import register_skill, execute_skill
 
@@ -74,15 +74,29 @@ async def get_jarvis_response(user_input: str, request_complexity: RequestComple
     
 ADDITIONAL CAPABILITIES:
 1. LONG-TERM MEMORY: You can store permanent memories for the user. If the user tells you to remember something, you MUST include: [[ADD_MEMORY: <category> | <fact to remember>]].
-2. DYNAMIC SKILL COMPILATION: If the user asks for a feature or a custom capability you don't have, you can write a python script. You MUST include: [[GENERATE_SKILL: <name> | <description> | <complete python code>]]. The python code should define a `def run():` function returning a string. IMPORTANT: The python code MUST use ONLY Python's built-in standard libraries (e.g., urllib.request, json, subprocess, os, datetime, math, re). NEVER use or import third-party packages (like pip-installed packages) as they might not exist on the host machine.
+2. DYNAMIC SKILL COMPILATION: If the user asks for a capability or custom feature you do NOT have in REGISTERED SKILLS, DO NOT automatically generate it or write a python script. Instead, you MUST ask the user for permission first (e.g., "I don't have that capability registered, sir. Would you like me to try generating a custom skill for this?"). ONLY if the user explicitly gives permission in a subsequent turn (e.g., "Yes, go ahead" or "Yes, do it"), you should write the python script using the exact tag: [[GENERATE_SKILL: <name> | <description> | <complete python code>]]. The python code should define a `def run():` function returning a string. IMPORTANT: The python code MUST use ONLY Python's built-in standard libraries (e.g., urllib.request, json, subprocess, os, datetime, math, re). NEVER use or import third-party packages.
 3. SKILL EXECUTION: You can run a previously generated skill by outputting: [[EXECUTE_SKILL: <name>]].
 4. SIDEBAR DASHBOARD: If the user asks to open/show the weather/time/schedule dashboard, you MUST include: [[SHOW_DASHBOARD]]. If the user asks to close/hide it, include: [[HIDE_DASHBOARD]]. If the user asks to open/show the space/satellite/orbit tracker dashboard, you MUST include: [[SHOW_SPACE_DASHBOARD]]. If they ask to close/hide it, include: [[HIDE_SPACE_DASHBOARD]].
 """
 
+    # Fetch registered skills dynamically
+    skills_list = get_all_skills()
+    skills_context = ""
+    if skills_list:
+        skills_context = (
+            "\nREGISTERED SKILLS:\n"
+            "If the user asks for information that can be answered or retrieved by any of these skills, you MUST immediately call them using [[EXECUTE_SKILL: <name>]] in your response. "
+            "DO NOT ask for permission first, and do not explain that you are running it - just execute it immediately. "
+            "IMPORTANT: The tag MUST contain ONLY the exact name of the registered skill as listed (e.g. [[EXECUTE_SKILL: get_weather]]). DO NOT append any arguments, parameters, colons or pipes inside the tag (e.g. do NOT output [[EXECUTE_SKILL: get_weather|Badulla]]). The skill will automatically parse the user query to find the location.\n"
+        )
+        for name, desc in skills_list:
+            skills_context += f"- {name}: {desc}\n"
+
     current_system = (
         config.SYSTEM_PROMPT
         + features_prompt
-        + f"\n\nCurrent Date & Time: {current_time_str}\nSchedule: {sched}"
+        + skills_context
+        + f"\nCurrent Date & Time: {current_time_str}\nSchedule: {sched}"
         + complexity_hint
         + memory_context
     )
@@ -148,6 +162,9 @@ ADDITIONAL CAPABILITIES:
 
         # Log assistant response to DB
         log_conversation("assistant", response_text)
+
+        if "[IGNORE]" in response_text or "[SKIP]" in response_text:
+            return response_text
 
         # Speak intermediate/conversational intro immediately before carrying out tasks
         display_text = clean_display_text(response_text)
