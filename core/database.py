@@ -48,6 +48,24 @@ def init_db():
         )
     """)
     
+    # Register pre-built default skills
+    default_skills = [
+        ("get_weather", "Fetch and return the current meteorological weather and air quality report for any city or location (defaults to user's location).", "skills/get_weather.py"),
+        ("get_space_weather", "Fetch NOAA Space Weather data including solar wind speed and current warning scales.", "skills/get_space_weather.py"),
+        ("get_space_telemetry", "Retrieve international space station ISS coordinates, velocity, crew info, and telemetry.", "skills/get_space_telemetry.py"),
+        ("get_crypto_prices", "Get current USD market rates for major cryptocurrencies including Bitcoin, Ethereum, Solana, and BNB.", "skills/get_crypto_prices.py"),
+        ("track_airplanes", "Track active airplanes, flight counts, speed, and altitude in the user's area or Sri Lanka bounds using OpenSky Network API.", "skills/track_airplanes.py"),
+        ("internet_speed_test", "Check current network connection status and latency (ping speed) to a public server.", "skills/internet_speed_test.py"),
+    ]
+    for name, desc, path in default_skills:
+        cursor.execute(
+            """INSERT INTO skills (timestamp, name, description, filepath) 
+               VALUES (?, ?, ?, ?)
+               ON CONFLICT(name) DO UPDATE SET 
+               description=excluded.description, filepath=excluded.filepath""",
+            (time.time(), name, desc, path)
+        )
+    
     conn.commit()
     conn.close()
 
@@ -151,6 +169,18 @@ def get_db_stats() -> Tuple[int, int, int]:
         mem_count, conv_count, skills_count = 0, 0, 0
     conn.close()
     return mem_count, conv_count, skills_count
+
+def get_all_skills() -> List[Tuple[str, str]]:
+    """Retrieve all registered skills (name, description)"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT name, description FROM skills")
+        rows = cursor.fetchall()
+    except Exception:
+        rows = []
+    conn.close()
+    return rows
 
 # Initialize db when this module is imported
 init_db()

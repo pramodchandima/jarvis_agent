@@ -39,6 +39,12 @@ def register_skill(name: str, description: str, code: str):
 
 def execute_skill(name: str) -> str:
     """Dynamically load and run a skill's run() function"""
+    # If the LLM tries to append parameters inside the execute tag (e.g. get_weather|Badulla), extract the actual skill name
+    if "|" in name:
+        name = name.split("|")[0].strip()
+    elif ":" in name:
+        name = name.split(":")[0].strip()
+
     filename = f"{name.lower().replace(' ', '_')}.py"
     filepath = os.path.join(SKILLS_DIR, filename)
     
