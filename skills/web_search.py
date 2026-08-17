@@ -1,8 +1,11 @@
 import urllib.request
 import urllib.parse
-import json
 import sqlite3
 import re
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 def clean_html(text):
     # Remove HTML tags
@@ -23,19 +26,35 @@ def run():
         
         user_msg = row[0] if row else ""
         if user_msg:
-            # Strip common conversational phrases to form a clean search query
-            cleaned = re.sub(r'[^\w\s]', '', user_msg).lower()
-            words = cleaned.split()
-            stop_words = {
-                "jarvis", "sir", "search", "google", "web", "internet", "for", "about", 
-                "tell", "me", "what", "is", "who", "was", "find", "lookup", "online",
-                "can", "you", "please", "query", "do", "know", "anything", "information"
-            }
-            query_words = [w for w in words if w not in stop_words]
-            if query_words:
-                query = " ".join(query_words)
-            else:
-                query = user_msg # Fallback to original message
+            # Use Groq to clean up conversational noise, echo and extract the optimal search query
+            from groq import Groq
+            from core.config_manager import config
+            
+            client_args = {"api_key": config.GROQ_API_KEY.strip()}
+            if getattr(config, "GROQ_BASE_URL", None):
+                client_args["base_url"] = config.GROQ_BASE_URL.strip()
+            groq_client = Groq(**client_args)
+            
+            prompt = (
+                "You are a search engine query optimizer. Convert the following conversational user message "
+                "into a short, effective 2-3 word search query for Google/DuckDuckGo. "
+                "Remove conversational filler, echo, and questions. Return ONLY the search keywords.\n\n"
+                f"User input: {user_msg}"
+            )
+            
+            try:
+                completion = groq_client.chat.completions.create(
+                    model=config.LLM_MODEL,
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=256
+                )
+                optimized_query = completion.choices[0].message.content.strip().strip('"').strip("'")
+                if optimized_query:
+                    query = optimized_query
+                else:
+                    query = user_msg
+            except Exception:
+                query = user_msg # Fallback
     except Exception:
         pass
 
