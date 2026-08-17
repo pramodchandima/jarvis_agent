@@ -162,14 +162,6 @@ function updateWeatherAnimation(description) {
 
 const flightsMap = new Map();
 
-function useFallbackAirspace() {
-    flightsList = [
-        { icao24: "alk1", callsign: "ALK503", country: "Sri Lanka", longitude: 80.2, latitude: 7.2, altitude: 8500, speed: 780, track: 120, lastUpdated: Date.now() },
-        { icao24: "sia2", callsign: "SIA284", country: "Singapore", longitude: 81.3, latitude: 8.5, altitude: 10600, speed: 890, track: 230, lastUpdated: Date.now() },
-        { icao24: "qtr3", callsign: "QTR79A", country: "Qatar", longitude: 79.8, latitude: 6.3, altitude: 9400, speed: 820, track: 340, lastUpdated: Date.now() }
-    ];
-}
-
 function pruneStaleFlights() {
     const now = Date.now();
     for (const [icao24, flight] of flightsMap.entries()) {
@@ -179,9 +171,6 @@ function pruneStaleFlights() {
         }
     }
     flightsList = Array.from(flightsMap.values());
-    if (flightsList.length === 0) {
-        useFallbackAirspace();
-    }
 }
 
 function saveOrUpdateFlight(icao24, newFlightData) {
@@ -223,6 +212,9 @@ async function fetchAirspaceData() {
                 const lat = ac.lat;
                 if (lon === null || lat === null) return;
                 
+                // Filter to Sri Lanka's maritime/airspace boundary (lat: 5.5 to 10.0, lon: 79.0 to 82.5)
+                if (lat < 5.5 || lat > 10.0 || lon < 79.0 || lon > 82.5) return;
+                
                 saveOrUpdateFlight(icao24, {
                     icao24: icao24,
                     callsign: callsign,
@@ -253,6 +245,9 @@ function mergeOpenSkyFromLocalData(data) {
     if (data && data.opensky_flights && data.opensky_flights.length > 0) {
         const now = Date.now();
         data.opensky_flights.forEach(flight => {
+            // Filter to Sri Lanka's maritime/airspace boundary (lat: 5.5 to 10.0, lon: 79.0 to 82.5)
+            if (flight.latitude < 5.5 || flight.latitude > 10.0 || flight.longitude < 79.0 || flight.longitude > 82.5) return;
+            
             saveOrUpdateFlight(flight.icao24, {
                 ...flight,
                 lastUpdated: now
@@ -272,25 +267,28 @@ function updateFlightDetailsUI() {
             const item = document.createElement('div');
             item.className = 'flight-detail-item';
             
+            const emergencyVal = (flight.emergency || 'none').toUpperCase();
+            const emergencyClass = (flight.emergency || 'none') !== 'none' ? 'emerg-warn' : '';
+            
             // Build dual-column HUD structure
             item.innerHTML = `
                 <div class="flight-detail-header">
-                    <span class="flight-detail-callsign">${flight.callsign}</span>
-                    <span class="flight-detail-hex">#${flight.icao24.toUpperCase()}</span>
+                    <span class="flight-detail-callsign">${flight.callsign || 'N/A'}</span>
+                    <span class="flight-detail-hex">#${(flight.icao24 || '').toUpperCase()}</span>
                 </div>
                 <div class="flight-detail-body">
                     <div class="flight-detail-col left-col">
-                        <div class="flight-detail-row"><span>ALTITUDE:</span><span class="val">${flight.altitude}m</span></div>
-                        <div class="flight-detail-row"><span>SPEED:</span><span class="val">${flight.speed}km/h</span></div>
-                        <div class="flight-detail-row"><span>HEADING:</span><span class="val">${flight.track}°</span></div>
-                        <div class="flight-detail-row"><span>INFO:</span><span class="val" style="font-size: 8px;">${flight.country}</span></div>
+                        <div class="flight-detail-row"><span>ALTITUDE:</span><span class="val">${flight.altitude || 0}m</span></div>
+                        <div class="flight-detail-row"><span>SPEED:</span><span class="val">${flight.speed || 0}km/h</span></div>
+                        <div class="flight-detail-row"><span>HEADING:</span><span class="val">${flight.track || 0}°</span></div>
+                        <div class="flight-detail-row"><span>INFO:</span><span class="val" style="font-size: 8px;">${flight.country || 'N/A'}</span></div>
                     </div>
                     <div class="flight-detail-col right-col">
-                        <div class="flight-detail-row"><span>EMERGENCY:</span><span class="val ${flight.emergency !== 'none' ? 'emerg-warn' : ''}">${flight.emergency.toUpperCase()}</span></div>
-                        <div class="flight-detail-row"><span>MACH SPD:</span><span class="val">${flight.mach}</span></div>
-                        <div class="flight-detail-row"><span>AIR TEMP:</span><span class="val">${flight.temp}</span></div>
-                        <div class="flight-detail-row"><span>WIND VEL:</span><span class="val" style="font-size: 7.5px;">${flight.wind}</span></div>
-                        <div class="flight-detail-row"><span>MCP ALT:</span><span class="val">${flight.mcpAlt}</span></div>
+                        <div class="flight-detail-row"><span>EMERGENCY:</span><span class="val ${emergencyClass}">${emergencyVal}</span></div>
+                        <div class="flight-detail-row"><span>MACH SPD:</span><span class="val">${flight.mach || 'N/A'}</span></div>
+                        <div class="flight-detail-row"><span>AIR TEMP:</span><span class="val">${flight.temp || 'N/A'}</span></div>
+                        <div class="flight-detail-row"><span>WIND VEL:</span><span class="val" style="font-size: 7.5px;">${flight.wind || 'N/A'}</span></div>
+                        <div class="flight-detail-row"><span>MCP ALT:</span><span class="val">${flight.mcpAlt || 'N/A'}</span></div>
                     </div>
                 </div>
             `;
@@ -359,11 +357,11 @@ function drawRadar() {
         ctx.lineWidth = 1;
         
         flightsList.forEach((flight, idx) => {
-            // Map GPS coords to canvas layout bounds relative to Bounding Box
-            const lonMin = 79.5;
+            // Map GPS coords to canvas layout bounds relative to Bounding Box (matching Sri Lanka maritime/airspace boundary)
+            const lonMin = 79.0;
             const lonMax = 82.5;
             const latMin = 5.5;
-            const latMax = 8.5;
+            const latMax = 10.0;
             
             const px = ((flight.longitude - lonMin) / (lonMax - lonMin)) * (maxRadius * 2) + (cx - maxRadius);
             const py = (1.0 - (flight.latitude - latMin) / (latMax - latMin)) * (maxRadius * 2) + (cy - maxRadius);
