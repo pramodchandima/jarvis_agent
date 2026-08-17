@@ -247,11 +247,9 @@ ADDITIONAL CAPABILITIES:
                         await speak_jarvis("Aborting the current task to address your new request, sir.")
                         # Reset depth to 0 and process the new query
                         return await get_jarvis_response(user_msg, request_complexity, depth=0)
-
             console.print(f"[bold cyan]System:[/] Executing skill: {skill_name}")
-            await speak_jarvis(f"Executing the skill now, sir.")
             
-            result = execute_skill(skill_name)
+            result = await asyncio.to_thread(execute_skill, skill_name)
             console.print(f"[bold cyan]System:[/] Execution Output: {result}")
             
             if "Error" in result:
