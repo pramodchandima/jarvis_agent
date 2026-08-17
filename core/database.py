@@ -48,14 +48,15 @@ def init_db():
         )
     """)
     
-    # Register pre-built default skills
+    # Register pre-built default skills with relevant keywords to help the LLM route requests accurately
     default_skills = [
-        ("get_weather", "Fetch and return the current meteorological weather and air quality report for any city or location (defaults to user's location).", "skills/get_weather.py"),
-        ("get_space_weather", "Fetch NOAA Space Weather data including solar wind speed and current warning scales.", "skills/get_space_weather.py"),
-        ("get_space_telemetry", "Retrieve international space station ISS coordinates, velocity, crew info, and telemetry.", "skills/get_space_telemetry.py"),
-        ("get_crypto_prices", "Get current USD market rates for major cryptocurrencies including Bitcoin, Ethereum, Solana, and BNB.", "skills/get_crypto_prices.py"),
-        ("track_airplanes", "Track active airplanes, flight counts, speed, and altitude in the user's area or Sri Lanka bounds using OpenSky Network API.", "skills/track_airplanes.py"),
-        ("internet_speed_test", "Check current network connection status and latency (ping speed) to a public server.", "skills/internet_speed_test.py"),
+        ("get_weather", "Fetch current meteorological weather and air quality report for any city or location. Keywords: weather, temperature, rain, wind, climate, forecast, hot, cold, humidity, aqi, air quality, outside.", "skills/get_weather.py"),
+        ("get_space_weather", "Fetch NOAA Space Weather data including solar wind speed and current warning scales. Keywords: solar wind, solar flare, space weather, geomagnetic storm, aurora, sun activity.", "skills/get_space_weather.py"),
+        ("get_space_telemetry", "Retrieve international space station ISS coordinates, velocity, crew info, telemetry, and track space satellites. Keywords: space station, iss, satellite, satellites, astronauts, orbit, altitude, space telemetry.", "skills/get_space_telemetry.py"),
+        ("get_crypto_prices", "Get current USD market rates for major cryptocurrencies. Keywords: crypto, cryptocurrency, bitcoin, btc, ethereum, eth, solana, sol, bnb, doge, coin price, crypto market.", "skills/get_crypto_prices.py"),
+        ("track_airplanes", "Track active airplanes, flight counts, speed, and altitude in the user's area using flight APIs. Keywords: airplane, aeroplane, flight, plane, planes, flight radar, overhead, aviation, air traffic, aircraft.", "skills/track_airplanes.py"),
+        ("internet_speed_test", "Check current network connection status and latency (ping speed) to a public server. Keywords: speed test, internet speed, ping, network latency, slow internet, connection speed, wifi speed, bandwidth.", "skills/internet_speed_test.py"),
+        ("web_search", "Search the internet/web for real-time information, answers, news, or topics you do not know about. Keywords: search, google, find out, latest news, current events, who is, what is, look up, online.", "skills/web_search.py"),
     ]
     for name, desc, path in default_skills:
         cursor.execute(
