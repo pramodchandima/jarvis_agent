@@ -19,32 +19,75 @@ def parse_schedule_file() -> list:
 
     try:
         with open(file_path, "r", encoding="utf-8") as f:
-            lines = f.readlines()
+            content = f.read()
         
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
-            
-            # Simple parsing: check for YYYY-MM-DD and HH:MM if present
-            date_match = re.search(r"(\d{4}-\d{2}-\d{2})", line)
-            time_match = re.search(r"(\d{2}:\d{2})", line)
-            
+        raw_items = []
+        for line in content.split("\n"):
+            for part in line.split(";"):
+                part = part.strip()
+                if part:
+                    raw_items.append(part)
+        
+        for item in raw_items:
+            date_match = re.search(r"(\d{4})[-/.](\d{2})[-/.](\d{2})", item)
+            is_yyyy_mm_dd = True
+            if not date_match:
+                date_match = re.search(r"(\d{2})[-/.](\d{2})[-/.](\d{4})", item)
+                is_yyyy_mm_dd = False
+                
             if date_match:
-                date_str = date_match.group(1)
-                time_str = time_match.group(1) if time_match else "00:00"
+                if is_yyyy_mm_dd:
+                    year, month, day = date_match.group(1), date_match.group(2), date_match.group(3)
+                else:
+                    day, month, year = date_match.group(1), date_match.group(2), date_match.group(4) if len(date_match.groups()) >= 4 else date_match.group(3)
+                
+                # Check for 12-hour format time match, e.g. "9:00 AM" or "10:30 PM"
+                time_match = re.search(r"(\d{1,2})(?::(\d{2}))?\s*(AM|PM|am|pm)", item, re.IGNORECASE)
+                if time_match:
+                    hours = int(time_match.group(1))
+                    minutes = int(time_match.group(2)) if time_match.group(2) else 0
+                    meridiem = time_match.group(3).upper()
+                    if meridiem == "PM" and hours < 12:
+                        hours += 12
+                    elif meridiem == "AM" and hours == 12:
+                        hours = 0
+                    time_str = f"{hours:02d}:{minutes:02d}"
+                else:
+                    # 24-hour format: "HH:MM"
+                    time_24_match = re.search(r"(\d{2}):(\d{2})", item)
+                    if time_24_match:
+                        time_str = time_24_match.group(0)
+                    else:
+                        time_str = "00:00"
                 
                 try:
-                    event_dt = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
-                    # Extract the event text (everything after the colon or date)
-                    event_text = line
-                    if ":" in line:
-                        event_text = line.split(":", 1)[1].strip()
+                    event_dt = datetime.strptime(f"{year}-{month}-{day} {time_str}", "%Y-%m-%d %H:%M")
                     
+                    # Clean text
+                    clean_text = item
+                    # Remove date string
+                    clean_text = clean_text.replace(date_match.group(0), "")
+                    # Remove weekday name
+                    clean_text = re.sub(r"\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b", "", clean_text, flags=re.IGNORECASE)
+                    # Remove empty parentheses/brackets
+                    clean_text = re.sub(r"\(\s*\)|\[\s*\]", "", clean_text)
+                    
+                    # Remove time range or time match
+                    clean_text = re.sub(r"\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm)?\s*-\s*\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm)", "", clean_text, flags=re.IGNORECASE)
+                    if time_match:
+                        clean_text = clean_text.replace(time_match.group(0), "")
+                    
+                    # Remove multiple commas/dashes/spaces
+                    clean_text = re.sub(r",\s*,", ",", clean_text)
+                    clean_text = clean_text.strip(" ,-")
+                    
+                    if not clean_text:
+                        clean_text = item
+                        
                     events.append({
                         "datetime": event_dt,
-                        "text": event_text,
-                        "original_line": line
+                        "text": clean_text,
+                        "original_line": item
                     })
                 except ValueError:
                     pass
