@@ -188,8 +188,6 @@ async def main():
                 if not user_text or len(str(user_text).strip()) < 2:
                     continue
                 user_text_str = str(user_text).strip()
-                console.print(f"\n[bold green]Sir (Spoken):[/] {user_text_str}")
-
             # Set flag to True to temporarily block background audio queueing
             jarvis_is_speaking = True
 
@@ -230,6 +228,10 @@ async def main():
             if is_noise:
                 jarvis_is_speaking = False
                 continue
+
+            # Print user speech only after it passes wake-word and noise filters
+            if input_type == "voice":
+                console.print(f"\n[bold green]Sir (Spoken):[/] {user_text_str}")
 
             # AI RESPONSE PHASE (handles intermediate & final speech internally)
             response = await get_jarvis_response(user_text_str, request_complexity)
