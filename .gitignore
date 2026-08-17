@@ -55,3 +55,30 @@ desktop.ini
 # Logs
 *.log
 logs/
+
+# Local AI model files (large binary files, downloaded locally — not for version control)
+audio/model/
+*.onnx
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+
+# Python virtual environments
+venv/
+.venv/
+env/
+.env/
+
+# pip / package install artifacts
+*.whl
+pip-wheel-metadata/
+site-packages/
+
+# Temp / runtime files
+tmp/
+temp/
+*.tmp
+jarvis_temp_*/
+
