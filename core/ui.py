@@ -82,10 +82,10 @@ def show_startup_banner() -> None:
     # Define overall status initialization success
     all_ok = all(stat[0] not in ("NO MIC", "OFFLINE", "KEY MISSING") for _, stat in checks)
     if all_ok:
-        init_msg = "[bold cyan]🚀 JARVIS PROTOCOLS INITIALIZED[/bold cyan]"
+        init_msg = "[bold cyan][ JARVIS PROTOCOLS INITIALIZED ][/bold cyan]"
         console.print(Align.center(Panel(init_msg, border_style="blue", expand=False)))
     else:
-        init_msg = "[bold yellow]⚠️ JARVIS PROTOCOLS INITIALIZED WITH WARNINGS[/bold yellow]"
+        init_msg = "[bold yellow][ JARVIS PROTOCOLS INITIALIZED WITH WARNINGS ][/bold yellow]"
         console.print(Align.center(Panel(init_msg, border_style="yellow", expand=False)))
     console.print("\n")
 

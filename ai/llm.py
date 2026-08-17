@@ -143,7 +143,7 @@ ADDITIONAL CAPABILITIES:
                             delta = chunk.get("message", {}).get("content", "")
                             response_text += delta
                             display_text = clean_display_text(response_text)
-                            live.update(Panel(Markdown(display_text), title="🤖 Jarvis", border_style="cyan"))
+                            live.update(Panel(Markdown(display_text), title="Jarvis", border_style="cyan"))
         else:
             completion = client.chat.completions.create(
                 model=config.LLM_MODEL,
@@ -158,7 +158,7 @@ ADDITIONAL CAPABILITIES:
                         delta = chunk.choices[0].delta.content
                         response_text += delta
                         display_text = clean_display_text(response_text)
-                        live.update(Panel(Markdown(display_text), title="🤖 Jarvis", border_style="cyan"))
+                        live.update(Panel(Markdown(display_text), title="Jarvis", border_style="cyan"))
 
         # Log assistant response to DB
         log_conversation("assistant", response_text)
