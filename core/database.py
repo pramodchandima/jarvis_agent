@@ -1,6 +1,5 @@
 import sqlite3
 import time
-import os
 from typing import List, Tuple
 
 DB_PATH = "jarvis.db"
