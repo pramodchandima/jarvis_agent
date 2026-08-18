@@ -4,20 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>J.A.R.V.I.S. Control Terminal</title>
+    <link rel="stylesheet" href="shared.css">
     <link rel="stylesheet" href="dashboard.css">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <script src="components.js" defer></script>
 </head>
 <body>
     <div class="scanlines"></div>
     <div class="main-terminal">
         <!-- Header -->
-        <div class="terminal-header">
-            <div class="status-indicator">
-                <span class="pulse-ring"></span>
-                <span class="hud-title">J.A.R.V.I.S. // AI COGNITIVE NETWORK</span>
-            </div>
-            <div class="timezone-hud" id="timezone-lbl">UTC</div>
-        </div>
+        <terminal-header title="J.A.R.V.I.S. // AI COGNITIVE NETWORK"></terminal-header>
 
         <!-- Futuristic Asymmetric Grid Layout -->
         <div class="hud-grid">
@@ -26,29 +22,22 @@
             <div class="grid-col left-sidebar">
                 
                 <!-- 01: Chrono -->
-                <div class="card tech-card time-card">
-                    <div class="tech-corner tl"></div><div class="tech-corner tr"></div>
-                    <div class="hud-num">01</div>
-                    <div class="hud-lbl">// SYSTEM CHRONO</div>
+                <tech-card num="01" label="// SYSTEM CHRONO" ext-class="time-card" corners="tl,tr">
                     <div class="time-display-group">
                         <div class="digital-time" id="clock-lbl">00:00:00</div>
                         <div class="digital-date" id="date-lbl">Loading...</div>
                     </div>
-                </div>
+                </tech-card>
 
                 <!-- 02: Active Protocols -->
-                <div class="card tech-card schedule-card">
-                    <div class="hud-num">02</div>
-                    <div class="hud-lbl">// ACTIVE PROTOCOLS (SCHEDULE)</div>
+                <tech-card num="02" label="// ACTIVE PROTOCOLS (SCHEDULE)" ext-class="schedule-card">
                     <div class="schedule-list" id="schedule-list">
                         <div class="schedule-item empty">Loading...</div>
                     </div>
-                </div>
+                </tech-card>
 
                 <!-- 03: System Health -->
-                <div class="card tech-card health-card">
-                    <div class="hud-num">03</div>
-                    <div class="hud-lbl">// CORES LOAD & SYSTEM HEALTH</div>
+                <tech-card num="03" label="// CORES LOAD & SYSTEM HEALTH" ext-class="health-card">
                     <div class="health-stats">
                         <div class="health-row">
                             <span class="health-lbl">CPU ARCH:</span>
@@ -63,13 +52,10 @@
                             <span class="health-val text-neon">GROQ CLOUD STABLE</span>
                         </div>
                     </div>
-                </div>
+                </tech-card>
 
                 <!-- 04: Data Recall -->
-                <div class="card tech-card recall-card" id="db-stats-group">
-                    <div class="tech-corner bl"></div><div class="tech-corner br"></div>
-                    <div class="hud-num">04</div>
-                    <div class="hud-lbl">// MEMORIES & DATA RECALL</div>
+                <tech-card num="04" label="// MEMORIES & DATA RECALL" ext-class="recall-card" corners="bl,br" id="db-stats-group">
                     <div class="db-stats">
                         <div class="db-row">
                             <span class="db-lbl">MEMORY BANKS:</span>
@@ -84,17 +70,14 @@
                             <span class="db-val" id="db-skill-lbl">0</span>
                         </div>
                     </div>
-                </div>
+                </tech-card>
 
             </div>
 
             <!-- Center Column: Active Airspace Radar Grid -->
             <div class="grid-col center-stage">
                 <!-- 09: Flight Telemetry Timetable -->
-                <div class="card timetable-card tech-card">
-                    <div class="tech-corner tl"></div><div class="tech-corner tr"></div>
-                    <div class="hud-num">09</div>
-                    <div class="hud-lbl">// FLIGHT TELEMETRY & TIMETABLE BOARD</div>
+                <tech-card num="09" label="// FLIGHT TELEMETRY & TIMETABLE BOARD" ext-class="timetable-card" corners="tl,tr">
                     <div class="timetable-wrapper">
                         <table class="fids-table">
                             <thead>
@@ -114,28 +97,23 @@
                             </tbody>
                         </table>
                     </div>
-                </div>
+                </tech-card>
 
-                <div class="card radar-card tech-card">
-                    <div class="tech-corner tl"></div><div class="tech-corner bl"></div><div class="tech-corner tr"></div><div class="tech-corner br"></div>
-                    <div class="hud-lbl">// ACTIVE AIRSPACE RADAR MAP</div>
+                <tech-card label="// ACTIVE AIRSPACE RADAR MAP" ext-class="radar-card" corners="tl,tr,bl,br">
                     <div class="radar-container">
                         <canvas id="radar-canvas"></canvas>
                         <div class="flight-details-panel" id="flight-details-list">
                             <div class="flight-detail-item empty">SCANNING AIRSPACE...</div>
                         </div>
                     </div>
-                </div>
+                </tech-card>
             </div>
 
             <!-- Right Column: Environmental Stats & Meteorological Core -->
             <div class="grid-col right-sidebar">
                 
-                <!-- 05: Meteorological Weather Core (Moved here!) -->
-                <div class="card weather-core tech-card">
-                    <div class="tech-corner tl"></div><div class="tech-corner tr"></div>
-                    <div class="hud-num">05</div>
-                    <div class="hud-lbl">// METEOROLOGICAL PROFILE</div>
+                <!-- 05: Meteorological Weather Core -->
+                <tech-card num="05" label="// METEOROLOGICAL PROFILE" ext-class="weather-core" corners="tl,tr">
                     <div class="core-body">
                         <div class="core-radar-ring">
                             <div class="radar-sweep"></div>
@@ -159,12 +137,10 @@
                             </div>
                         </div>
                     </div>
-                </div>
+                </tech-card>
 
                 <!-- 06: Atmosphere Profile -->
-                <div class="card tech-card stat-card">
-                    <div class="hud-num">06</div>
-                    <div class="hud-lbl">// ATMOSPHERE PROFILE</div>
+                <tech-card num="06" label="// ATMOSPHERE PROFILE" ext-class="stat-card">
                     <div class="stat-rows">
                         <div class="stat-row">
                             <span class="stat-lbl">HUMIDITY</span>
@@ -183,12 +159,10 @@
                             <span class="stat-val" id="rain-prob-lbl">--%</span>
                         </div>
                     </div>
-                </div>
+                </tech-card>
 
                 <!-- 07: Wind Profile -->
-                <div class="card tech-card stat-card">
-                    <div class="hud-num">07</div>
-                    <div class="hud-lbl">// WIND PROFILE</div>
+                <tech-card num="07" label="// WIND PROFILE" ext-class="stat-card">
                     <div class="stat-rows">
                         <div class="stat-row">
                             <span class="stat-lbl">VELOCITY</span>
@@ -199,13 +173,10 @@
                             <span class="stat-val" id="wind-dir-lbl">--°</span>
                         </div>
                     </div>
-                </div>
+                </tech-card>
 
                 <!-- 08: Air & Biosphere -->
-                <div class="card tech-card stat-card">
-                    <div class="tech-corner bl"></div><div class="tech-corner br"></div>
-                    <div class="hud-num">08</div>
-                    <div class="hud-lbl">// BIOSPHERE PROFILE</div>
+                <tech-card num="08" label="// BIOSPHERE PROFILE" ext-class="stat-card" corners="bl,br">
                     <div class="stat-rows">
                         <div class="stat-row">
                             <span class="stat-lbl">PM2.5 AQI</span>
@@ -224,12 +195,12 @@
                             <span class="stat-val" id="sun-times-lbl">-- / --</span>
                         </div>
                     </div>
-                </div>
+                </tech-card>
 
             </div>
 
         </div>
     </div>
-    <script src="dashboard.js"></script>
+    <script src="dashboard.js" defer></script>
 </body>
 </html>
