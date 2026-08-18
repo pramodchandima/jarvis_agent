@@ -142,9 +142,9 @@ body {
     overflow: hidden;
 }
 
-/* Center stage has 2 rows: map (big) + quake feed (small) */
+/* Center stage has 2 rows of split maps */
 .center-stage {
-    grid-template-rows: 1fr 140px;
+    grid-template-rows: 1fr 1fr;
 }
 
 /* Card base styles */
@@ -294,68 +294,77 @@ body {
 .solar-lbl { color: rgba(255, 255, 255, 0.5); }
 .solar-val { color: var(--neon-blue); font-weight: bold; }
 
-/* Center Map stage */
-.map-card {
-    flex-grow: 1;
-    border: 1px solid var(--glass-border);
+/* Split Map Layout */
+.split-map-card {
+    flex: 1 1 0%;
     display: flex;
     flex-direction: column;
     min-height: 0;
+    padding: 10px 12px;
 }
-.map-container {
+.split-map-container {
+    display: flex;
+    flex-direction: row;
+    gap: 12px;
+    flex-grow: 1;
+    min-height: 0;
+    margin-top: 5px;
+}
+.map-wrapper {
     flex-grow: 1;
     position: relative;
-    width: 100%;
     height: 100%;
-    overflow: hidden;
+    min-width: 0;
+    background: rgba(0, 243, 255, 0.01);
+    border: 1px solid rgba(0, 243, 255, 0.04);
 }
-#orbit-canvas {
+.details-wrapper {
+    width: 200px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+    height: 100%;
+    border-left: 1px dashed rgba(0, 243, 255, 0.12);
+    padding-left: 12px;
+    box-sizing: border-box;
+}
+#quake-canvas, #iss-canvas {
     position: absolute;
     top: 0; left: 0;
     width: 100%; height: 100%;
     display: block;
-    /* GPU compositing for canvas animations */
     will-change: contents;
     image-rendering: pixelated;
 }
-.quake-overlay {
-    position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    pointer-events: none;
-}
 
-/* Earthquake Feed Card (bottom of center) */
-.quake-card {
-    flex-shrink: 0;
-    height: 130px;
-    border-top: 2px solid rgba(255, 149, 0, 0.3);
-    display: flex;
-    flex-direction: column;
-}
+/* Earthquake Feed Card */
 .quake-list {
     display: flex;
+    flex-direction: column;
     gap: 6px;
-    overflow-x: auto;
-    overflow-y: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
     flex-grow: 1;
-    align-items: flex-start;
-    padding-bottom: 2px;
+    height: 100%;
+    width: 100%;
 }
-.quake-list::-webkit-scrollbar { height: 2px; }
+.quake-list::-webkit-scrollbar { width: 2px; }
 .quake-list::-webkit-scrollbar-thumb { background: var(--neon-orange); }
 .quake-item {
     background: rgba(255, 149, 0, 0.04);
     border: 1px solid rgba(255, 149, 0, 0.15);
     border-radius: 3px;
-    padding: 6px 10px;
+    padding: 6px 8px;
     font-family: var(--font-mono);
     font-size: 9px;
-    white-space: nowrap;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
     gap: 3px;
+    width: 100%;
+    box-sizing: border-box;
 }
 .quake-mag {
     font-size: 13px;
@@ -516,4 +525,33 @@ body {
 .tick-sep {
     font-size: 6px;
     color: rgba(0,243,255,0.2);
+}
+
+/* Satellite List styling */
+.satellite-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    height: 100%;
+    width: 100%;
+}
+.satellite-list::-webkit-scrollbar { width: 2px; }
+.satellite-list::-webkit-scrollbar-thumb { background: var(--neon-blue); }
+.sat-item {
+    background: rgba(0, 243, 255, 0.02);
+    border: 1px solid rgba(0, 243, 255, 0.08);
+    border-radius: 3px;
+    padding: 6px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 100%;
+    box-sizing: border-box;
+}
+.sat-item.empty {
+    align-items: center;
+    justify-content: center;
+    color: rgba(0, 243, 255, 0.4);
 }

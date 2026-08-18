@@ -90,53 +90,41 @@
 
             <!-- Center Column -->
             <div class="grid-col center-stage">
-                <div class="card map-card tech-card">
-                    <div class="tech-corner tl"></div><div class="tech-corner bl"></div><div class="tech-corner tr"></div><div class="tech-corner br"></div>
-                    <div class="hud-lbl">// ISS LIVE ORBITAL MAP PROJECTION</div>
-                    <div class="map-container">
-                        <canvas id="orbit-canvas"></canvas>
-                        <!-- Earthquake markers overlay -->
-                        <div class="quake-overlay" id="quake-overlay"></div>
+                <!-- Row 1: Seismic Activity -->
+                <div class="card split-map-card tech-card">
+                    <div class="tech-corner tl"></div><div class="tech-corner tr"></div><div class="tech-corner bl"></div><div class="tech-corner br"></div>
+                    <div class="hud-lbl">// SEISMIC ACTIVITY CORE — LAT/LON GRAPH</div>
+                    <div class="split-map-container">
+                        <div class="map-wrapper">
+                            <canvas id="quake-canvas"></canvas>
+                        </div>
+                        <div class="details-wrapper">
+                            <div class="quake-list" id="quake-list">
+                                <div class="quake-item empty">SCANNING SEISMIC DATA...</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Bottom: Earthquake Alert Feed -->
-                <div class="card tech-card quake-card">
-                    <div class="tech-corner tl"></div><div class="tech-corner tr"></div>
-                    <div class="hud-num">Q</div>
-                    <div class="hud-lbl">// USGS SEISMIC ACTIVITY FEED — LAST 24H</div>
-                    <div class="quake-list" id="quake-list">
-                        <div class="quake-item empty">SCANNING SEISMIC DATA...</div>
+                <!-- Row 2: Orbital Telemetry -->
+                <div class="card split-map-card tech-card">
+                    <div class="tech-corner tl"></div><div class="tech-corner tr"></div><div class="tech-corner bl"></div><div class="tech-corner br"></div>
+                    <div class="hud-lbl">// ORBITAL TELEMETRY CORE — ISS LIVE TRACKER</div>
+                    <div class="split-map-container">
+                        <div class="map-wrapper">
+                            <canvas id="iss-canvas"></canvas>
+                        </div>
+                        <div class="details-wrapper">
+                            <div class="satellite-list" id="satellite-list">
+                                <div class="sat-item empty">TRACKING ORBITAL PATHS...</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Right Column -->
             <div class="grid-col right-sidebar">
-
-                <!-- 07: ISS Orbital Telemetry -->
-                <div class="card tech-card telemetry-card">
-                    <div class="hud-num">07</div>
-                    <div class="hud-lbl">// ISS LIVE TELEMETRY CORE</div>
-                    <div class="telemetry-stats">
-                        <div class="tel-row">
-                            <span class="tel-lbl">LATITUDE</span>
-                            <span class="tel-val" id="lat-lbl">--°</span>
-                        </div>
-                        <div class="tel-row">
-                            <span class="tel-lbl">LONGITUDE</span>
-                            <span class="tel-val" id="lon-lbl">--°</span>
-                        </div>
-                        <div class="tel-row">
-                            <span class="tel-lbl">ALTITUDE</span>
-                            <span class="tel-val" id="alt-lbl">-- km</span>
-                        </div>
-                        <div class="tel-row">
-                            <span class="tel-lbl">VELOCITY</span>
-                            <span class="tel-val" id="vel-lbl">-- km/h</span>
-                        </div>
-                    </div>
-                </div>
 
                 <!-- 08: Orbit Environment -->
                 <div class="card tech-card env-card">
@@ -217,6 +205,7 @@
     </div>
     
     <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/satellite.js/4.0.0/satellite.min.js"></script>
     <script id="data-script"></script>
     <script src="space_dashboard.js"></script>
 </body>

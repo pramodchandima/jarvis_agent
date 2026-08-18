@@ -4,13 +4,18 @@
 // ==============================
 
 // Canvas setup
-const canvas = document.getElementById('orbit-canvas');
-const ctx = canvas.getContext('2d');
+const quakeCanvas = document.getElementById('quake-canvas');
+const quakeCtx = quakeCanvas ? quakeCanvas.getContext('2d') : null;
+const issCanvas = document.getElementById('iss-canvas');
+const issCtx = issCanvas ? issCanvas.getContext('2d') : null;
 
 let issPos = { lat: 0, lon: 0 };
 let orbitalHistory = [];
 let mapSweepAngle = 0;
 let earthquakeMarkers = []; // Store for canvas drawing
+let satelliteTles = {}; // Raw TLEs from backend
+let propagatedSatellites = []; // Real-time coordinates
+let satListThrottle = 0;
 
 // Cyberpunk simplified vector world map outline coordinates
 const WORLD_VECTORS = [
@@ -26,144 +31,312 @@ const WORLD_VECTORS = [
     [ [115, -20], [145, -15], [150, -35], [115, -33], [113, -25], [115, -20] ]
 ];
 
-function resizeCanvas() {
-    const rect = canvas.parentElement.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = rect.height;
+function resizeCanvases() {
+    if (quakeCanvas && quakeCanvas.parentElement) {
+        const rect = quakeCanvas.parentElement.getBoundingClientRect();
+        quakeCanvas.width = rect.width;
+        quakeCanvas.height = rect.height;
+    }
+    if (issCanvas && issCanvas.parentElement) {
+        const rect = issCanvas.parentElement.getBoundingClientRect();
+        issCanvas.width = rect.width;
+        issCanvas.height = rect.height;
+    }
 }
-window.addEventListener('resize', resizeCanvas, { passive: true });
-resizeCanvas();
+window.addEventListener('resize', resizeCanvases, { passive: true });
+resizeCanvases();
 
-function gpsToPixels(lon, lat) {
-    const margin = 25;
+function gpsToPixels(lon, lat, canvas) {
+    if (!canvas) return { x: 0, y: 0 };
+    const margin = 20;
     const px = ((lon + 180) / 360) * (canvas.width - margin * 2) + margin;
     const py = (1.0 - (lat + 90) / 180) * (canvas.height - margin * 2) + margin;
     return { x: px, y: py };
 }
 
-function drawOrbitMap() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // 1. Draw grid
-    ctx.strokeStyle = 'rgba(0, 243, 255, 0.05)';
-    ctx.lineWidth = 1;
-    for (let i = 0; i <= 18; i++) {
-        const x = (canvas.width / 18) * i;
-        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
-    }
-    for (let j = 0; j <= 10; j++) {
-        const y = (canvas.height / 10) * j;
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
-    }
-
-    // 2. Draw continents
-    ctx.strokeStyle = 'rgba(0, 243, 255, 0.18)';
-    ctx.lineWidth = 1.5;
-    ctx.fillStyle = 'rgba(0, 243, 255, 0.02)';
+function drawWorldMap(ctx, canvas) {
+    ctx.strokeStyle = 'rgba(0, 243, 255, 0.15)';
+    ctx.lineWidth = 1.2;
+    ctx.fillStyle = 'rgba(0, 243, 255, 0.015)';
     WORLD_VECTORS.forEach(polygon => {
         ctx.beginPath();
         polygon.forEach((pt, idx) => {
-            const pos = gpsToPixels(pt[0], pt[1]);
+            const pos = gpsToPixels(pt[0], pt[1], canvas);
             if (idx === 0) ctx.moveTo(pos.x, pos.y);
             else ctx.lineTo(pos.x, pos.y);
         });
         ctx.stroke();
         ctx.fill();
     });
+}
 
-    // 3. Draw earthquake markers on map
+function drawGridAndAxes(ctx, canvas) {
+    ctx.strokeStyle = 'rgba(0, 243, 255, 0.04)';
+    ctx.lineWidth = 1;
+    
+    // Draw longitude lines (-180 to 180, step 30)
+    for (let lon = -180; lon <= 180; lon += 30) {
+        const p1 = gpsToPixels(lon, -90, canvas);
+        const p2 = gpsToPixels(lon, 90, canvas);
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+        
+        // Label longitude at bottom
+        if (lon % 60 === 0) {
+            ctx.fillStyle = 'rgba(0, 243, 255, 0.35)';
+            ctx.font = '8px "Share Tech Mono"';
+            ctx.textAlign = 'center';
+            const label = lon === 0 ? '0°' : lon > 0 ? `${lon}°E` : `${Math.abs(lon)}°W`;
+            ctx.fillText(label, p1.x, canvas.height - 4);
+        }
+    }
+    
+    // Draw latitude lines (-90 to 90, step 30)
+    for (let lat = -90; lat <= 90; lat += 30) {
+        const p1 = gpsToPixels(-180, lat, canvas);
+        const p2 = gpsToPixels(180, lat, canvas);
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+        
+        // Label latitude along left edge
+        if (lat % 30 === 0 && lat !== -90 && lat !== 90) {
+            ctx.fillStyle = 'rgba(0, 243, 255, 0.35)';
+            ctx.font = '8px "Share Tech Mono"';
+            ctx.textAlign = 'left';
+            const label = lat === 0 ? '0°' : lat > 0 ? `${lat}°N` : `${Math.abs(lat)}°S`;
+            ctx.fillText(label, 4, p1.y - 2);
+        }
+    }
+}
+
+function drawQuakeMap() {
+    if (!quakeCanvas || !quakeCtx) return;
+    quakeCtx.clearRect(0, 0, quakeCanvas.width, quakeCanvas.height);
+
+    drawGridAndAxes(quakeCtx, quakeCanvas);
+    drawWorldMap(quakeCtx, quakeCanvas);
+
+    // Draw earthquake markers on map
     earthquakeMarkers.forEach(eq => {
-        const pos = gpsToPixels(eq.lon, eq.lat);
+        const pos = gpsToPixels(eq.lon, eq.lat, quakeCanvas);
         const radius = Math.max(3, eq.mag * 2.5);
         const isMajor = eq.mag >= 6.0;
         const color = isMajor ? 'rgba(255, 59, 48,' : 'rgba(255, 149, 0,';
         
         // Ripple ring
-        ctx.strokeStyle = `${color}0.4)`;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(pos.x, pos.y, radius + 4, 0, Math.PI * 2);
-        ctx.stroke();
+        quakeCtx.strokeStyle = `${color}0.4)`;
+        quakeCtx.lineWidth = 1;
+        quakeCtx.beginPath();
+        quakeCtx.arc(pos.x, pos.y, radius + 4, 0, Math.PI * 2);
+        quakeCtx.stroke();
         
         // Core dot
-        ctx.fillStyle = `${color}0.9)`;
-        ctx.shadowColor = `${color}0.8)`;
-        ctx.shadowBlur = 8;
-        ctx.beginPath();
-        ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.shadowBlur = 0;
+        quakeCtx.fillStyle = `${color}0.9)`;
+        quakeCtx.shadowColor = `${color}0.8)`;
+        quakeCtx.shadowBlur = 8;
+        quakeCtx.beginPath();
+        quakeCtx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
+        quakeCtx.fill();
+        quakeCtx.shadowBlur = 0;
         
         // Magnitude label
         if (eq.mag >= 5.0) {
-            ctx.fillStyle = 'rgba(255,255,255,0.7)';
-            ctx.font = '8px "Share Tech Mono"';
-            ctx.fillText(`M${eq.mag.toFixed(1)}`, pos.x + radius + 2, pos.y + 3);
+            quakeCtx.fillStyle = 'rgba(255,255,255,0.7)';
+            quakeCtx.font = '8px "Share Tech Mono"';
+            quakeCtx.fillText(`M${eq.mag.toFixed(1)}`, pos.x + radius + 2, pos.y + 3);
         }
     });
 
-    // 4. Draw ISS orbital history path
-    if (orbitalHistory.length > 1) {
-        ctx.strokeStyle = 'var(--neon-blue)';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([5, 5]);
-        ctx.beginPath();
-        orbitalHistory.forEach((pt, idx) => {
-            const pos = gpsToPixels(pt.lon, pt.lat);
-            if (idx === 0) ctx.moveTo(pos.x, pos.y);
-            else ctx.lineTo(pos.x, pos.y);
-        });
-        ctx.stroke();
-        ctx.setLineDash([]);
+    requestAnimationFrame(drawQuakeMap);
+}
+
+function propagateSatellites() {
+    if (typeof satellite === 'undefined') return;
+    propagatedSatellites = [];
+    const now = new Date();
+    
+    Object.entries(satelliteTles).forEach(([catnr, satData]) => {
+        try {
+            const satrec = satellite.twoline2satrec(satData.line1, satData.line2);
+            const positionAndVelocity = satellite.propagate(satrec, now);
+            const positionEci = positionAndVelocity.position;
+            
+            if (positionEci) {
+                const gmst = satellite.gstime(now);
+                const positionGd = satellite.eciToGeodetic(positionEci, gmst);
+                
+                const lonDeg = satellite.degreesLong(positionGd.longitude);
+                const latDeg = satellite.degreesLat(positionGd.latitude);
+                const altKm = positionGd.height;
+                
+                let velocityKmh = 27600; // fallback
+                if (positionAndVelocity.velocity) {
+                    const vel = positionAndVelocity.velocity;
+                    const velKms = Math.sqrt(vel.x*vel.x + vel.y*vel.y + vel.z*vel.z);
+                    velocityKmh = velKms * 3600;
+                }
+                
+                propagatedSatellites.push({
+                    catnr: catnr,
+                    name: satData.name,
+                    lat: latDeg,
+                    lon: lonDeg,
+                    alt: altKm,
+                    vel: velocityKmh
+                });
+            }
+        } catch (e) {
+            console.error("Propagation error for satellite", catnr, e);
+        }
+    });
+}
+
+function renderSatelliteList() {
+    const list = document.getElementById('satellite-list');
+    if (!list) return;
+    
+    list.innerHTML = '';
+    const frag = document.createDocumentFragment();
+    
+    propagatedSatellites.forEach(sat => {
+        const item = document.createElement('div');
+        item.className = 'sat-item';
+        
+        let color = 'var(--neon-blue)';
+        if (sat.catnr === '20580') color = '#bf5af2';
+        else if (sat.catnr === '48274') color = '#ffd60a';
+        else if (sat.catnr === '33591') color = '#30d158';
+        
+        item.innerHTML = `
+            <div class="sat-item-header" style="border-left: 2px solid ${color}; padding-left: 6px; display: flex; justify-content: space-between; align-items: center;">
+                <span class="sat-name" style="color: ${color}; font-weight: bold; font-size: 9.5px;">${sat.name}</span>
+                <span class="sat-badge" style="font-size: 7px; color: ${color}; border: 1px solid ${color}; padding: 1px 3px; border-radius: 2px;">ACTIVE</span>
+            </div>
+            <div class="sat-item-details" style="font-family: var(--font-mono); font-size: 8px; color: rgba(255,255,255,0.6); margin-top: 4px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
+                <span>LAT: ${sat.lat.toFixed(2)}°</span>
+                <span>LON: ${sat.lon.toFixed(2)}°</span>
+                <span>ALT: ${Math.round(sat.alt)} km</span>
+                <span>VEL: ${Math.round(sat.vel).toLocaleString()} km/h</span>
+            </div>
+        `;
+        frag.appendChild(item);
+    });
+    
+    if (propagatedSatellites.length === 0) {
+        list.innerHTML = '<div class="sat-item empty">TRACKING ORBITAL PATHS...</div>';
+    } else {
+        list.appendChild(frag);
+    }
+}
+
+function drawIssMap() {
+    if (!issCanvas || !issCtx) return;
+    issCtx.clearRect(0, 0, issCanvas.width, issCanvas.height);
+
+    drawGridAndAxes(issCtx, issCanvas);
+    drawWorldMap(issCtx, issCanvas);
+
+    // Calculate real-time coordinates
+    propagateSatellites();
+
+    // Throttle DOM list updates to save CPU cycles
+    satListThrottle++;
+    if (satListThrottle >= 30) {
+        renderSatelliteList();
+        satListThrottle = 0;
     }
 
-    // 5. Draw ISS tracker + radar sweep
-    const target = gpsToPixels(issPos.lon, issPos.lat);
-    ctx.save();
-    ctx.translate(target.x, target.y);
-    ctx.rotate(mapSweepAngle);
-    const grad = ctx.createConicGradient(0, 0, 0);
-    grad.addColorStop(0, 'rgba(0, 243, 255, 0.2)');
-    grad.addColorStop(0.2, 'rgba(0, 243, 255, 0.02)');
-    grad.addColorStop(1, 'transparent');
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(0, 0, 60, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
+    // Draw orbital history for ISS
+    const issProp = propagatedSatellites.find(s => s.catnr === '25544');
+    if (issProp) {
+        issPos.lat = issProp.lat;
+        issPos.lon = issProp.lon;
+        issPos.alt = issProp.alt;
+        issPos.vel = issProp.vel;
+        if (orbitalHistory.length === 0 ||
+            Math.abs(orbitalHistory[orbitalHistory.length - 1].lon - issProp.lon) > 0.5) {
+            orbitalHistory.push({ lat: issProp.lat, lon: issProp.lon });
+            if (orbitalHistory.length > 50) orbitalHistory.shift();
+        }
+    }
 
-    ctx.strokeStyle = 'rgba(0, 243, 255, 0.25)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(target.x, target.y, 45, 0, Math.PI * 2);
-    ctx.stroke();
+    if (orbitalHistory.length > 1) {
+        issCtx.strokeStyle = 'var(--neon-blue)';
+        issCtx.lineWidth = 1.5;
+        issCtx.setLineDash([4, 4]);
+        issCtx.beginPath();
+        orbitalHistory.forEach((pt, idx) => {
+            const pos = gpsToPixels(pt.lon, pt.lat, issCanvas);
+            if (idx === 0) issCtx.moveTo(pos.x, pos.y);
+            else issCtx.lineTo(pos.x, pos.y);
+        });
+        issCtx.stroke();
+        issCtx.setLineDash([]);
+    }
 
-    // Crosshair
-    ctx.strokeStyle = 'var(--neon-blue)';
-    ctx.lineWidth = 1.5;
-    const len = 6, dist = 8;
-    ctx.beginPath();
-    ctx.moveTo(target.x - dist, target.y - dist + len); ctx.lineTo(target.x - dist, target.y - dist); ctx.lineTo(target.x - dist + len, target.y - dist);
-    ctx.moveTo(target.x + dist, target.y - dist + len); ctx.lineTo(target.x + dist, target.y - dist); ctx.lineTo(target.x + dist - len, target.y - dist);
-    ctx.moveTo(target.x - dist, target.y + dist - len); ctx.lineTo(target.x - dist, target.y + dist); ctx.lineTo(target.x - dist + len, target.y + dist);
-    ctx.moveTo(target.x + dist, target.y + dist - len); ctx.lineTo(target.x + dist, target.y + dist); ctx.lineTo(target.x + dist - len, target.y + dist);
-    ctx.stroke();
+    // Draw all propagated satellites on canvas
+    propagatedSatellites.forEach(sat => {
+        const target = gpsToPixels(sat.lon, sat.lat, issCanvas);
+        
+        let color = 'var(--neon-blue)';
+        if (sat.catnr === '20580') color = '#bf5af2';
+        else if (sat.catnr === '48274') color = '#ffd60a';
+        else if (sat.catnr === '33591') color = '#30d158';
 
-    ctx.fillStyle = 'var(--neon-blue)';
-    ctx.shadowColor = 'var(--neon-blue)';
-    ctx.shadowBlur = 10;
-    ctx.beginPath();
-    ctx.arc(target.x, target.y, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = 'rgba(0, 243, 255, 0.9)';
-    ctx.font = '10px "Share Tech Mono"';
-    ctx.fillText("TGT: ISS (ZARYA)", target.x + 12, target.y - 4);
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-    ctx.fillText(`ALT: ${Math.round(issPos.alt || 420)}km | VEL: ${Math.round(issPos.vel || 27600)}km/h`, target.x + 12, target.y + 6);
+        // Custom crosshair/radar for ISS only
+        if (sat.catnr === '25544') {
+            issCtx.save();
+            issCtx.translate(target.x, target.y);
+            issCtx.rotate(mapSweepAngle);
+            const grad = issCtx.createConicGradient(0, 0, 0);
+            grad.addColorStop(0, 'rgba(0, 243, 255, 0.15)');
+            grad.addColorStop(0.2, 'rgba(0, 243, 255, 0.02)');
+            grad.addColorStop(1, 'transparent');
+            issCtx.fillStyle = grad;
+            issCtx.beginPath();
+            issCtx.arc(0, 0, 45, 0, Math.PI * 2);
+            issCtx.fill();
+            issCtx.restore();
+
+            issCtx.strokeStyle = 'rgba(0, 243, 255, 0.2)';
+            issCtx.lineWidth = 1;
+            issCtx.beginPath();
+            issCtx.arc(target.x, target.y, 30, 0, Math.PI * 2);
+            issCtx.stroke();
+
+            // Crosshair
+            issCtx.strokeStyle = color;
+            issCtx.lineWidth = 1.2;
+            const len = 4, dist = 5;
+            issCtx.beginPath();
+            issCtx.moveTo(target.x - dist, target.y - dist + len); issCtx.lineTo(target.x - dist, target.y - dist); issCtx.lineTo(target.x - dist + len, target.y - dist);
+            issCtx.moveTo(target.x + dist, target.y - dist + len); issCtx.lineTo(target.x + dist, target.y - dist); issCtx.lineTo(target.x + dist - len, target.y - dist);
+            issCtx.moveTo(target.x - dist, target.y + dist - len); issCtx.lineTo(target.x - dist, target.y + dist); issCtx.lineTo(target.x - dist + len, target.y + dist);
+            issCtx.moveTo(target.x + dist, target.y + dist - len); issCtx.lineTo(target.x + dist, target.y + dist); issCtx.lineTo(target.x + dist - len, target.y + dist);
+            issCtx.stroke();
+        }
+
+        // Target core dot
+        issCtx.fillStyle = color;
+        issCtx.shadowColor = color;
+        issCtx.shadowBlur = 6;
+        issCtx.beginPath();
+        issCtx.arc(target.x, target.y, 4, 0, Math.PI * 2);
+        issCtx.fill();
+        issCtx.shadowBlur = 0;
+
+        // Label name
+        issCtx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+        issCtx.font = '8px "Share Tech Mono"';
+        issCtx.fillText(sat.name, target.x + 8, target.y - 1);
+    });
 
     mapSweepAngle += 0.02;
-    requestAnimationFrame(drawOrbitMap);
+    requestAnimationFrame(drawIssMap);
 }
 
 // ==============================
@@ -172,22 +345,14 @@ function drawOrbitMap() {
 function updateLocalDataUI(data) {
     if (!data) return;
 
-    // ISS Telemetry
+    // TLE Data Update
+    if (data.tle) {
+        satelliteTles = data.tle;
+    }
+
+    // ISS Telemetry metadata
     if (data.iss && data.iss.latitude !== undefined) {
         const iss = data.iss;
-        issPos.lat = iss.latitude;
-        issPos.lon = iss.longitude;
-        issPos.alt = iss.altitude;
-        issPos.vel = iss.velocity;
-        if (orbitalHistory.length === 0 ||
-            Math.abs(orbitalHistory[orbitalHistory.length - 1].lon - iss.longitude) > 0.5) {
-            orbitalHistory.push({ lat: iss.latitude, lon: iss.longitude });
-            if (orbitalHistory.length > 50) orbitalHistory.shift();
-        }
-        document.getElementById('lat-lbl').innerText = `${iss.latitude.toFixed(4)}°`;
-        document.getElementById('lon-lbl').innerText = `${iss.longitude.toFixed(4)}°`;
-        document.getElementById('alt-lbl').innerText = `${iss.altitude.toFixed(2)} km`;
-        document.getElementById('vel-lbl').innerText = `${Math.round(iss.velocity).toLocaleString()} km/h`;
         document.getElementById('phase-lbl').innerText = (iss.visibility || "daylight").toUpperCase();
         document.getElementById('solar-lat-lbl').innerText = `${(iss.solar_lat || 0).toFixed(2)}°`;
         document.getElementById('solar-lon-lbl').innerText = `${(iss.solar_lon || 0).toFixed(2)}°`;
@@ -388,5 +553,6 @@ updateTimeDisplay();
 
 // Initial Triggers
 reloadSpaceScript();
-drawOrbitMap();
+drawQuakeMap();
+drawIssMap();
 setInterval(reloadSpaceScript, 3000);

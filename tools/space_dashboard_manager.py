@@ -17,6 +17,7 @@ solar_wind_cache = {}
 earthquake_cache = {}
 crypto_cache = {}
 maritime_cache = {}
+tle_cache = {}
 
 last_fetch_times = {
     "iss": 0.0,
@@ -25,7 +26,8 @@ last_fetch_times = {
     "solar": 0.0,
     "earthquakes": 0.0,
     "crypto": 0.0,
-    "maritime": 0.0
+    "maritime": 0.0,
+    "tle": 0.0
 }
 
 def fetch_json(url):
@@ -36,7 +38,7 @@ def fetch_json(url):
 def update_space_data():
     """Fetch all data and write to space_data.js"""
     global iss_cache, astronauts_cache, nasa_apod_cache, solar_wind_cache
-    global earthquake_cache, crypto_cache, maritime_cache, last_fetch_times
+    global earthquake_cache, crypto_cache, maritime_cache, tle_cache, last_fetch_times
     now = time.time()
 
     # 1. ISS coordinates — every 5 seconds
@@ -122,6 +124,33 @@ def update_space_data():
         except Exception:
             pass
 
+    # 8. Satellite TLEs — every 43200 seconds (12 hours)
+    if now - last_fetch_times.get("tle", 0.0) > 43200 or not tle_cache:
+        try:
+            catnrs = {
+                "25544": "ISS (ZARYA)",
+                "20580": "HUBBLE SPACE TELESCOPE",
+                "48274": "TIANGONG (CSS)",
+                "33591": "NOAA 19"
+            }
+            new_tle_cache = {}
+            for catnr, name in catnrs.items():
+                url = f"https://celestrak.org/NORAD/elements/gp.php?CATNR={catnr}&FORMAT=tle"
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    lines = response.read().decode('utf-8').strip().split('\n')
+                    if len(lines) >= 3:
+                        new_tle_cache[catnr] = {
+                            "name": name,
+                            "line1": lines[1].strip(),
+                            "line2": lines[2].strip()
+                        }
+            if new_tle_cache:
+                tle_cache = new_tle_cache
+                last_fetch_times["tle"] = now
+        except Exception:
+            pass
+
     # Write combined data to space_data.js
     gui_dir = "gui"
     if not os.path.exists(gui_dir):
@@ -136,7 +165,8 @@ def update_space_data():
         "space_weather": solar_wind_cache,
         "earthquakes": earthquake_cache,
         "crypto": crypto_cache,
-        "maritime": maritime_cache
+        "maritime": maritime_cache,
+        "tle": tle_cache
     }
 
     try:
