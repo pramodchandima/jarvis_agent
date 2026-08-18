@@ -44,14 +44,12 @@ Start every response with a tag: [Dry], [Sarcastic], [Concerned], [Witty], [Neut
 # --- AUDIO SETTINGS ---
 ENERGY_THRESHOLD = 1000 
 DYNAMIC_ENERGY = False   
-ADJUST_DURATION = 1.0    
 PAUSE_THRESHOLD = 0.8    
 PHRASE_THRESHOLD = 0.3   
 
 # --- NOISE & WAKE WORDS ---
 WAKE_WORDS = ["jarvis", "sir"]
 REQUIRE_WAKE_WORD = True 
-SESSION_TIMEOUT = 12     
 
 NOISE_WORDS = [
     "Thank you", "you", "Thank you.", "Subtitle", "Subtitles", 

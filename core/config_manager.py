@@ -19,12 +19,10 @@ Your goal is to be exceptionally helpful while adapting your behavior based on t
 5. Performance Priority: Keep responses concise and actionable. Avoid unnecessary verbose explanations unless asked."""
         ENERGY_THRESHOLD = 300
         DYNAMIC_ENERGY = True
-        ADJUST_DURATION = 0.5
         PAUSE_THRESHOLD = 0.8
         PHRASE_THRESHOLD = 0.3
         WAKE_WORDS = ["jarvis", "sir"]
         REQUIRE_WAKE_WORD = True
-        SESSION_TIMEOUT = 10
         NOISE_WORDS = []
         SCHEDULE_FILE = "schedule.txt"
         AUDIO_CACHE_SIZE = 5
