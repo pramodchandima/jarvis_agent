@@ -17,19 +17,7 @@ let satelliteTles = {}; // Raw TLEs from backend
 let propagatedSatellites = []; // Real-time coordinates
 let satListThrottle = 0;
 
-// Cyberpunk simplified vector world map outline coordinates
-const WORLD_VECTORS = [
-    // North America
-    [ [-168, 65], [-120, 60], [-80, 70], [-60, 50], [-80, 25], [-100, 20], [-110, 10], [-90, 15], [-80, 9], [-80, 20], [-120, 35], [-125, 48], [-168, 65] ],
-    // South America
-    [ [-80, 9], [-50, -5], [-35, -7], [-70, -55], [-75, -50], [-70, -20], [-80, -5], [-80, 9] ],
-    // Africa / Europe / Asia
-    [ [-15, 65], [10, 60], [30, 70], [60, 75], [100, 75], [170, 70], [140, 35], [110, 15], [80, 10], [50, 12], [40, 25], [32, 30], [20, 10], [15, -34], [30, -30], [40, -15], [50, 12], [30, 30], [10, 35], [-15, 20], [-15, 65] ],
-    // Greenland
-    [ [-60, 75], [-40, 70], [-30, 80], [-60, 80], [-60, 75] ],
-    // Australia
-    [ [115, -20], [145, -15], [150, -35], [115, -33], [113, -25], [115, -20] ]
-];
+// WORLD_VECTORS, gpsToPixels, drawWorldMap, drawGridAndAxes → see shared.js
 
 function resizeCanvases() {
     if (quakeCanvas && quakeCanvas.parentElement) {
@@ -47,73 +35,6 @@ window.addEventListener('resize', resizeCanvases, { passive: true });
 if (quakeCanvas?.parentElement) new ResizeObserver(resizeCanvases).observe(quakeCanvas.parentElement);
 if (issCanvas?.parentElement) new ResizeObserver(resizeCanvases).observe(issCanvas.parentElement);
 resizeCanvases();
-
-function gpsToPixels(lon, lat, canvas) {
-    if (!canvas) return { x: 0, y: 0 };
-    const margin = 20;
-    const px = ((lon + 180) / 360) * (canvas.width - margin * 2) + margin;
-    const py = (1.0 - (lat + 90) / 180) * (canvas.height - margin * 2) + margin;
-    return { x: px, y: py };
-}
-
-function drawWorldMap(ctx, canvas) {
-    ctx.strokeStyle = 'rgba(0, 243, 255, 0.15)';
-    ctx.lineWidth = 1.2;
-    ctx.fillStyle = 'rgba(0, 243, 255, 0.015)';
-    WORLD_VECTORS.forEach(polygon => {
-        ctx.beginPath();
-        polygon.forEach((pt, idx) => {
-            const pos = gpsToPixels(pt[0], pt[1], canvas);
-            if (idx === 0) ctx.moveTo(pos.x, pos.y);
-            else ctx.lineTo(pos.x, pos.y);
-        });
-        ctx.stroke();
-        ctx.fill();
-    });
-}
-
-function drawGridAndAxes(ctx, canvas) {
-    ctx.strokeStyle = 'rgba(0, 243, 255, 0.04)';
-    ctx.lineWidth = 1;
-    
-    // Draw longitude lines (-180 to 180, step 30)
-    for (let lon = -180; lon <= 180; lon += 30) {
-        const p1 = gpsToPixels(lon, -90, canvas);
-        const p2 = gpsToPixels(lon, 90, canvas);
-        ctx.beginPath();
-        ctx.moveTo(p1.x, p1.y);
-        ctx.lineTo(p2.x, p2.y);
-        ctx.stroke();
-        
-        // Label longitude at bottom
-        if (lon % 60 === 0) {
-            ctx.fillStyle = 'rgba(0, 243, 255, 0.35)';
-            ctx.font = '8px "Share Tech Mono"';
-            ctx.textAlign = 'center';
-            const label = lon === 0 ? '0°' : lon > 0 ? `${lon}°E` : `${Math.abs(lon)}°W`;
-            ctx.fillText(label, p1.x, canvas.height - 4);
-        }
-    }
-    
-    // Draw latitude lines (-90 to 90, step 30)
-    for (let lat = -90; lat <= 90; lat += 30) {
-        const p1 = gpsToPixels(-180, lat, canvas);
-        const p2 = gpsToPixels(180, lat, canvas);
-        ctx.beginPath();
-        ctx.moveTo(p1.x, p1.y);
-        ctx.lineTo(p2.x, p2.y);
-        ctx.stroke();
-        
-        // Label latitude along left edge
-        if (lat % 30 === 0 && lat !== -90 && lat !== 90) {
-            ctx.fillStyle = 'rgba(0, 243, 255, 0.35)';
-            ctx.font = '8px "Share Tech Mono"';
-            ctx.textAlign = 'left';
-            const label = lat === 0 ? '0°' : lat > 0 ? `${lat}°N` : `${Math.abs(lat)}°S`;
-            ctx.fillText(label, 4, p1.y - 2);
-        }
-    }
-}
 
 function drawQuakeMap() {
     if (!quakeCanvas || !quakeCtx) return;
@@ -468,13 +389,8 @@ function renderEarthquakes(features) {
         const place = p.place || 'Unknown Region';
         const depth = f.geometry.coordinates[2].toFixed(0);
         
-        // Format API epoch time (milliseconds) to readable UTC string
-        const dateObj = new Date(p.time);
-        const mm = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
-        const dd = String(dateObj.getUTCDate()).padStart(2, '0');
-        const hh = String(dateObj.getUTCHours()).padStart(2, '0');
-        const min = String(dateObj.getUTCMinutes()).padStart(2, '0');
-        const timeStr = `${mm}/${dd} ${hh}:${min} UTC`;
+        // Format API epoch time using shared.js helper
+        const timeStr = formatEpochToUTC(p.time);
 
         const item = document.createElement('div');
         item.className = 'quake-item';
@@ -489,29 +405,7 @@ function renderEarthquakes(features) {
     list.appendChild(frag);
 }
 
-// ==============================
-// CRYPTO TICKER UPDATE
-// ==============================
-function updateCryptoTicker(prices) {
-    const map = {
-        'btc': 't-btc', 'eth': 't-eth', 'bnb': 't-bnb',
-        'sol': 't-sol', 'xrp': 't-xrp', 'doge': 't-doge',
-        'gold': 't-gold', 'oil': 't-oil', 'lkr': 't-lkr', 'eur': 't-eur'
-    };
-    Object.entries(map).forEach(([key, id]) => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        const val = prices[key];
-        if (val === undefined || val === null) return;
-        const prev = parseFloat(el.dataset.prev || val);
-        el.dataset.prev = val;
-        const numVal = parseFloat(val);
-        if (isNaN(numVal)) { el.innerText = val; return; }
-        el.innerText = numVal > 1000 ? `$${numVal.toLocaleString('en-US', {maximumFractionDigits: 0})}` :
-                       numVal > 1   ? `$${numVal.toFixed(2)}` : `$${numVal.toFixed(4)}`;
-        el.className = 'tick-price' + (numVal > prev ? ' up' : numVal < prev ? ' down' : '');
-    });
-}
+// updateCryptoTicker → see shared.js
 
 // ==============================
 // MARITIME STATUS UPDATE
@@ -536,34 +430,21 @@ function updateMaritime(maritime) {
 }
 
 // ==============================
-// DATA RELOAD
-// ==============================
-function reloadSpaceScript() {
-    const oldScript = document.getElementById('data-script');
-    if (oldScript) oldScript.remove();
-    const script = document.createElement('script');
-    script.id = 'data-script';
-    script.src = `space_data.js?t=${Date.now()}`;
-    script.onload = () => {
-        if (window.space_data) updateLocalDataUI(window.space_data);
-    };
-    document.head.appendChild(script);
-}
-
-// ==============================
 // LIVE TIME DISPLAY
 // ==============================
 function updateTimeDisplay() {
-    const now = new Date();
-    const utcStr = now.toUTCString().replace('GMT', 'UTC');
     const el = document.getElementById('timezone-lbl');
-    if (el) el.innerText = now.toISOString().slice(0,19).replace('T', ' ') + ' UTC';
+    if (el) el.innerText = new Date().toISOString().slice(0, 19).replace('T', ' ') + ' UTC';
 }
 setInterval(updateTimeDisplay, 1000);
 updateTimeDisplay();
 
-// Initial Triggers
-reloadSpaceScript();
+// ==============================
+// DATA RELOAD + INITIAL TRIGGERS
+// startScriptPoller → see shared.js
+// ==============================
 drawQuakeMap();
 drawIssMap();
-setInterval(reloadSpaceScript, 3000);
+startScriptPoller('space_data.js', 'data-script', () => {
+    if (window.space_data) updateLocalDataUI(window.space_data);
+}, 3000);

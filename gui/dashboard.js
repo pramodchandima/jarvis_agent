@@ -45,15 +45,8 @@ function updateLocalClock() {
     }
 }
 
-function formatTimeString(isoString) {
-    if (!isoString) return "--:--";
-    try {
-        const date = new Date(isoString);
-        return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-    } catch (e) {
-        return "--:--";
-    }
-}
+// formatTimeString → see shared.js
+
 
 // Fetch 14 Weather & Air Quality parameters
 async function fetchLiveWeather() {
@@ -305,30 +298,8 @@ function updateFlightDetailsUI() {
         listContainer.innerHTML = '';
         if (sortedFlights.length > 0) {
             sortedFlights.forEach(flight => {
-                let flightRoute = 'DXB ➔ CMB';
-                if (flight.origin === "CMB" || (flight.origin && flight.origin.toUpperCase() === "CMB")) {
-                    flightRoute = `CMB ➔ ${flight.destination || "SIN"}`;
-                } else if (flight.destination === "CMB" || (flight.destination && flight.destination.toUpperCase() === "CMB")) {
-                    flightRoute = `${flight.origin || "DXB"} ➔ CMB`;
-                } else {
-                    const track = flight.track || 0;
-                    const callsign = (flight.callsign || "").trim().toUpperCase();
-                    if (track > 45 && track <= 225) {
-                        let dest = "SIN";
-                        if (callsign.startsWith("UL")) dest = "SIN";
-                        else if (callsign.startsWith("SQ")) dest = "SIN";
-                        else if (callsign.startsWith("MH")) dest = "KUL";
-                        else if (callsign.startsWith("AI")) dest = "MAA";
-                        flightRoute = `CMB ➔ ${dest}`;
-                    } else {
-                        let orig = "DXB";
-                        if (callsign.startsWith("UL")) orig = "DXB";
-                        else if (callsign.startsWith("EK")) orig = "DXB";
-                        else if (callsign.startsWith("QR")) orig = "DOH";
-                        else if (callsign.startsWith("EY")) orig = "AUH";
-                        flightRoute = `${orig} ➔ CMB`;
-                    }
-                }
+                // Use shared.js parseFlightRoute helper
+                const { route: flightRoute } = parseFlightRoute(flight);
 
                 const item = document.createElement('div');
                 item.className = 'flight-detail-item';
@@ -376,39 +347,10 @@ function updateFlightDetailsUI() {
                 
                 let statusText = 'CRUISING';
                 let statusClass = 'cruising';
-                let flightType = 'ARR';
-                let flightRoute = 'DXB ➔ CMB';
                 let flightTime = '00:00';
                 
-                // Determine Flight Type and Route based on origin/destination
-                if (flight.origin === "CMB" || (flight.origin && flight.origin.toUpperCase() === "CMB")) {
-                    flightType = "DEP";
-                    flightRoute = `CMB ➔ ${flight.destination || "SIN"}`;
-                } else if (flight.destination === "CMB" || (flight.destination && flight.destination.toUpperCase() === "CMB")) {
-                    flightType = "ARR";
-                    flightRoute = `${flight.origin || "DXB"} ➔ CMB`;
-                } else {
-                    // Heuristic route parsing based on track/heading
-                    const track = flight.track || 0;
-                    const callsign = (flight.callsign || "").trim().toUpperCase();
-                    if (track > 45 && track <= 225) {
-                        flightType = "DEP";
-                        let dest = "SIN";
-                        if (callsign.startsWith("UL")) dest = "SIN";
-                        else if (callsign.startsWith("SQ")) dest = "SIN";
-                        else if (callsign.startsWith("MH")) dest = "KUL";
-                        else if (callsign.startsWith("AI")) dest = "MAA";
-                        flightRoute = `CMB ➔ ${dest}`;
-                    } else {
-                        flightType = "ARR";
-                        let orig = "DXB";
-                        if (callsign.startsWith("UL")) orig = "DXB";
-                        else if (callsign.startsWith("EK")) orig = "DXB";
-                        else if (callsign.startsWith("QR")) orig = "DOH";
-                        else if (callsign.startsWith("EY")) orig = "AUH";
-                        flightRoute = `${orig} ➔ CMB`;
-                    }
-                }
+                // Use shared.js parseFlightRoute helper
+                const { type: flightType, route: flightRoute } = parseFlightRoute(flight);
 
                 // Dynamically calculate EST time
                 const now = new Date();
@@ -672,29 +614,6 @@ function updateAirportScheduleUI(scheduleData) {
     });
 }
 
-function reloadScheduleScript() {
-    const oldScript = document.getElementById('data-script');
-    if (oldScript) {
-        oldScript.remove();
-    }
-    
-    const script = document.createElement('script');
-    script.id = 'data-script';
-    script.src = `data.js?t=${Date.now()}`;
-    script.onload = () => {
-        if (window.jarvis_data) {
-            updateLocalDataUI(window.jarvis_data);
-            mergeOpenSkyFromLocalData(window.jarvis_data);
-            // Populate FIDS timetable with real airport.lk schedule
-            if (window.jarvis_data.airport_schedule) {
-                updateAirportScheduleUI(window.jarvis_data.airport_schedule);
-            }
-        }
-    };
-    document.head.appendChild(script);
-}
-
-
 // Initial triggers
 updateLocalClock();
 fetchLiveWeather();
@@ -704,5 +623,16 @@ drawRadar(); // Start HTML5 Canvas animation loop
 // Intervals
 setInterval(updateLocalClock, 1000);       // Clock tick
 setInterval(fetchLiveWeather, 600000);     // Fetch weather every 10m
-setInterval(fetchAirspaceData, 10000);     // Fetch live flight ADSB.lol every 10s (unlimited)
-setInterval(reloadScheduleScript, 2000);   // Pull schedule, DB stats, and OpenSky flights every 2s
+setInterval(fetchAirspaceData, 10000);     // Fetch live flight ADSB.lol every 10s
+
+// Use shared.js startScriptPoller for data.js reload (replaces reloadScheduleScript)
+startScriptPoller('data.js', 'data-script', () => {
+    if (window.jarvis_data) {
+        updateLocalDataUI(window.jarvis_data);
+        mergeOpenSkyFromLocalData(window.jarvis_data);
+        if (window.jarvis_data.airport_schedule) {
+            updateAirportScheduleUI(window.jarvis_data.airport_schedule);
+        }
+    }
+}, 2000);
+
