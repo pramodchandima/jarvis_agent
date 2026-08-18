@@ -1,6 +1,16 @@
 // Dynamic script loading variables
 let flightsList = [];
 let radarSweepAngle = 0;
+let airspaceStatus = 'SCANNING AIRSPACE...';
+
+// 200 nautical miles around Bandaranaike International Airport (CMB).
+const AIRSPACE_BOUNDS = {
+    minLat: 3.85,
+    maxLat: 10.52,
+    minLon: 76.52,
+    maxLon: 83.25
+};
+const RADAR_COLOR = '#00f3ff';
 
 // Canvas setup
 const canvas = document.getElementById('radar-canvas');
@@ -8,10 +18,11 @@ const ctx = canvas.getContext('2d');
 
 function resizeCanvas() {
     const rect = canvas.parentElement.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = rect.height;
+    canvas.width = Math.max(1, Math.floor(rect.width));
+    canvas.height = Math.max(1, Math.floor(rect.height));
 }
 window.addEventListener('resize', resizeCanvas);
+new ResizeObserver(resizeCanvas).observe(canvas.parentElement);
 resizeCanvas();
 
 function updateLocalClock() {
@@ -28,7 +39,10 @@ function updateLocalClock() {
     const offsetHours = Math.floor(Math.abs(offsetMin) / 60);
     const offsetRemainingMin = Math.abs(offsetMin) % 60;
     const sign = offsetMin >= 0 ? '+' : '-';
-    document.getElementById('timezone-lbl').innerText = `GMT${sign}${offsetHours}:${String(offsetRemainingMin).padStart(2, '0')}`;
+    const timezoneLabel = document.getElementById('timezone-lbl');
+    if (timezoneLabel) {
+        timezoneLabel.innerText = `GMT${sign}${offsetHours}:${String(offsetRemainingMin).padStart(2, '0')}`;
+    }
 }
 
 function formatTimeString(isoString) {
@@ -208,12 +222,12 @@ async function fetchAirspaceData() {
             data.ac.forEach(ac => {
                 const icao24 = ac.hex;
                 const callsign = (ac.flight || "").trim() || "N/A";
-                const lon = ac.lon;
-                const lat = ac.lat;
-                if (lon === null || lat === null) return;
+                const lon = Number(ac.lon);
+                const lat = Number(ac.lat);
+                if (!Number.isFinite(lon) || !Number.isFinite(lat)) return;
                 
-                // Filter to Sri Lanka's maritime/airspace boundary (lat: 5.5 to 10.0, lon: 79.0 to 82.5)
-                if (lat < 5.5 || lat > 10.0 || lon < 79.0 || lon > 82.5) return;
+                if (lat < AIRSPACE_BOUNDS.minLat || lat > AIRSPACE_BOUNDS.maxLat ||
+                    lon < AIRSPACE_BOUNDS.minLon || lon > AIRSPACE_BOUNDS.maxLon) return;
                 
                 saveOrUpdateFlight(icao24, {
                     icao24: icao24,
@@ -232,9 +246,12 @@ async function fetchAirspaceData() {
                     lastUpdated: now
                 });
             });
+            airspaceStatus = 'LIVE AIRSPACE DATA';
+        } else {
+            airspaceStatus = 'NO AIRCRAFT REPORTED IN RANGE';
         }
     } catch (e) {
-        // Fail silently
+        airspaceStatus = 'LIVE AIRSPACE FEED UNAVAILABLE — RETRYING';
     }
     pruneStaleFlights();
     updateFlightDetailsUI();
@@ -245,14 +262,20 @@ function mergeOpenSkyFromLocalData(data) {
     if (data && data.opensky_flights && data.opensky_flights.length > 0) {
         const now = Date.now();
         data.opensky_flights.forEach(flight => {
-            // Filter to Sri Lanka's maritime/airspace boundary (lat: 5.5 to 10.0, lon: 79.0 to 82.5)
-            if (flight.latitude < 5.5 || flight.latitude > 10.0 || flight.longitude < 79.0 || flight.longitude > 82.5) return;
+            const latitude = Number(flight.latitude);
+            const longitude = Number(flight.longitude);
+            if (!Number.isFinite(latitude) || !Number.isFinite(longitude) ||
+                latitude < AIRSPACE_BOUNDS.minLat || latitude > AIRSPACE_BOUNDS.maxLat ||
+                longitude < AIRSPACE_BOUNDS.minLon || longitude > AIRSPACE_BOUNDS.maxLon) return;
             
             saveOrUpdateFlight(flight.icao24, {
                 ...flight,
+                latitude,
+                longitude,
                 lastUpdated: now
             });
         });
+        airspaceStatus = 'LIVE AIRSPACE DATA';
         pruneStaleFlights();
         updateFlightDetailsUI();
     }
@@ -282,6 +305,31 @@ function updateFlightDetailsUI() {
         listContainer.innerHTML = '';
         if (sortedFlights.length > 0) {
             sortedFlights.forEach(flight => {
+                let flightRoute = 'DXB ➔ CMB';
+                if (flight.origin === "CMB" || (flight.origin && flight.origin.toUpperCase() === "CMB")) {
+                    flightRoute = `CMB ➔ ${flight.destination || "SIN"}`;
+                } else if (flight.destination === "CMB" || (flight.destination && flight.destination.toUpperCase() === "CMB")) {
+                    flightRoute = `${flight.origin || "DXB"} ➔ CMB`;
+                } else {
+                    const track = flight.track || 0;
+                    const callsign = (flight.callsign || "").trim().toUpperCase();
+                    if (track > 45 && track <= 225) {
+                        let dest = "SIN";
+                        if (callsign.startsWith("UL")) dest = "SIN";
+                        else if (callsign.startsWith("SQ")) dest = "SIN";
+                        else if (callsign.startsWith("MH")) dest = "KUL";
+                        else if (callsign.startsWith("AI")) dest = "MAA";
+                        flightRoute = `CMB ➔ ${dest}`;
+                    } else {
+                        let orig = "DXB";
+                        if (callsign.startsWith("UL")) orig = "DXB";
+                        else if (callsign.startsWith("EK")) orig = "DXB";
+                        else if (callsign.startsWith("QR")) orig = "DOH";
+                        else if (callsign.startsWith("EY")) orig = "AUH";
+                        flightRoute = `${orig} ➔ CMB`;
+                    }
+                }
+
                 const item = document.createElement('div');
                 item.className = 'flight-detail-item';
                 
@@ -299,6 +347,7 @@ function updateFlightDetailsUI() {
                             <div class="flight-detail-row"><span>SPEED:</span><span class="val">${flight.speed || 0}km/h</span></div>
                             <div class="flight-detail-row"><span>HEADING:</span><span class="val">${flight.track || 0}°</span></div>
                             <div class="flight-detail-row"><span>INFO:</span><span class="val" style="font-size: 8px;">${flight.country || 'N/A'}</span></div>
+                            <div class="flight-detail-row"><span>ROUTE:</span><span class="val" style="font-size: 8px;">${flightRoute}</span></div>
                         </div>
                         <div class="flight-detail-col right-col">
                             <div class="flight-detail-row"><span>EMERGENCY:</span><span class="val ${emergencyClass}">${emergencyVal}</span></div>
@@ -312,7 +361,7 @@ function updateFlightDetailsUI() {
                 listContainer.appendChild(item);
             });
         } else {
-            listContainer.innerHTML = '<div class="flight-detail-item empty">SCANNING AIRSPACE...</div>';
+            listContainer.innerHTML = `<div class="flight-detail-item empty">${airspaceStatus}</div>`;
         }
     }
 
@@ -477,38 +526,18 @@ function drawRadar() {
     ctx.fill();
     ctx.restore();
     
-    // 4. Draw active flight blips and linking lines
+    // 4. Draw active flight blips
     if (flightsList.length > 0) {
-        ctx.strokeStyle = 'rgba(0, 243, 255, 0.15)';
-        ctx.lineWidth = 1;
-        
         flightsList.forEach((flight, idx) => {
             // Map GPS coords to canvas layout bounds relative to Bounding Box (matching Sri Lanka maritime/airspace boundary)
-            const lonMin = 79.0;
-            const lonMax = 82.5;
-            const latMin = 5.5;
-            const latMax = 10.0;
+            const { minLon: lonMin, maxLon: lonMax, minLat: latMin, maxLat: latMax } = AIRSPACE_BOUNDS;
             
             const px = ((flight.longitude - lonMin) / (lonMax - lonMin)) * (maxRadius * 2) + (cx - maxRadius);
             const py = (1.0 - (flight.latitude - latMin) / (latMax - latMin)) * (maxRadius * 2) + (cy - maxRadius);
             
-            // Draw connecting vector link to adjacent plane (the "countries linking" animation effect)
-            if (idx < flightsList.length - 1) {
-                const nextFlight = flightsList[idx + 1];
-                const nx = ((nextFlight.longitude - lonMin) / (lonMax - lonMin)) * (maxRadius * 2) + (cx - maxRadius);
-                const ny = (1.0 - (nextFlight.latitude - latMin) / (latMax - latMin)) * (maxRadius * 2) + (cy - maxRadius);
-                
-                ctx.beginPath();
-                ctx.moveTo(px, py);
-                ctx.lineTo(nx, ny);
-                ctx.setLineDash([4, 4]); // Dash link
-                ctx.stroke();
-                ctx.setLineDash([]); // Reset
-            }
-            
             // Draw plane glowing dot
-            ctx.fillStyle = 'var(--neon-blue)';
-            ctx.shadowColor = 'var(--neon-blue)';
+            ctx.fillStyle = RADAR_COLOR;
+            ctx.shadowColor = RADAR_COLOR;
             ctx.shadowBlur = 8;
             ctx.beginPath();
             ctx.arc(px, py, 4, 0, Math.PI * 2);
@@ -517,7 +546,7 @@ function drawRadar() {
             
             // Draw flight heading vector line
             const headingRad = (flight.track - 90) * (Math.PI / 180);
-            ctx.strokeStyle = 'var(--neon-blue)';
+            ctx.strokeStyle = RADAR_COLOR;
             ctx.beginPath();
             ctx.moveTo(px, py);
             ctx.lineTo(px + Math.cos(headingRad) * 15, py + Math.sin(headingRad) * 15);
@@ -533,7 +562,7 @@ function drawRadar() {
         ctx.fillStyle = 'rgba(0, 243, 255, 0.3)';
         ctx.font = '11px "Share Tech Mono"';
         ctx.textAlign = 'center';
-        ctx.fillText("NO AIR TRAJECTORIES IN SECTOR", cx, cy);
+        ctx.fillText(airspaceStatus, cx, cy);
         ctx.textAlign = 'start';
     }
     
