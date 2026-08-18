@@ -24,7 +24,7 @@ schedule_cache = []
 last_schedule_fetch = 0.0
 
 def fetch_flightradar_flights():
-    """Fetch FlightRadar24 flights for Sri Lanka bounds (CORS-proof)"""
+    """Fetch live flights from OpenSky Network for Sri Lanka bounds (CORS-proof)"""
     global flight_cache, last_flight_fetch
     now = time.time()
     # Cache and pull once every 20 seconds
@@ -33,30 +33,45 @@ def fetch_flightradar_flights():
         
     try:
         # Sri Lanka bounds: North=10.0, South=5.5, West=79.0, East=82.5
-        url = "https://data-live.flightradar24.com/zones/fcgi/feed.js?bounds=10.0,5.5,79.0,82.5&adsb=1&air=1"
+        # OpenSky uses lamin, lomin, lamax, lomax
+        url = "https://opensky-network.org/api/states/all?lamin=5.5&lomin=79.0&lamax=10.0&lomax=82.5"
         req = urllib.request.Request(url, headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "application/json"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         })
         with urllib.request.urlopen(req, timeout=12) as response:
             res_data = json.loads(response.read().decode('utf-8'))
             temp_list = []
-            for key, val in res_data.items():
-                if key in ("full_count", "version"):
-                    continue
-                if isinstance(val, list) and len(val) > 13:
+            states = res_data.get("states", []) or []
+            for s in states:
+                if len(s) > 10:
+                    icao24 = s[0]
+                    callsign = (s[1] or "").strip() or "N/A"
+                    origin_country = s[2] or "N/A"
+                    lon = s[5]
+                    lat = s[6]
+                    alt = s[7] # altitude in meters
+                    speed_ms = s[9] # velocity in m/s
+                    track = s[10] or 0
+                    
+                    if lon is None or lat is None:
+                        continue
+                        
+                    # Calculate emergency from squawk (s[14])
+                    squawk = s[14] if len(s) > 14 else None
+                    emergency = "general" if squawk == "7700" else "none"
+                    
                     temp_list.append({
-                        "icao24": val[0],
-                        "callsign": (val[16] or "").strip() or "N/A",
-                        "country": f"TYPE: {val[8] or 'N/A'} | REG: {val[9] or 'N/A'}",
-                        "origin": val[11] or "CMB",
-                        "destination": val[12] or "CMB",
-                        "longitude": val[2],
-                        "latitude": val[1],
-                        "altitude": round(val[4]) if val[4] is not None else 0,
-                        "speed": round(val[5] * 1.852) if val[5] is not None else 0, # Convert knots to km/h
-                        "track": val[3] or 0,
-                        "emergency": "none",
+                        "icao24": icao24,
+                        "callsign": callsign,
+                        "country": f"Origin: {origin_country}",
+                        "origin": "CMB",
+                        "destination": "CMB",
+                        "longitude": lon,
+                        "latitude": lat,
+                        "altitude": round(alt) if alt is not None else 0,
+                        "speed": round(speed_ms * 3.6) if speed_ms is not None else 0, # convert m/s to km/h
+                        "track": round(track),
+                        "emergency": emergency,
                         "mach": "N/A",
                         "temp": "N/A",
                         "wind": "N/A",
