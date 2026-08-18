@@ -192,10 +192,10 @@ function saveOrUpdateFlight(icao24, newFlightData) {
     }
 }
 
-// Fetch active flight vectors from ADSB.lol API (Sri Lanka center, 250nm radius, every 10s)
+// Fetch active flight vectors from ADSB.lol API (Katunayake CMB Airport center, 200nm radius, every 10s)
 async function fetchAirspaceData() {
     try {
-        const res = await fetch("https://api.adsb.lol/v2/lat/7.9/lon/80.7/dist/250");
+        const res = await fetch("https://api.adsb.lol/v2/lat/7.1802/lon/79.8837/dist/200");
         if (!res.ok) {
             pruneStaleFlights();
             updateFlightDetailsUI();
@@ -258,44 +258,155 @@ function mergeOpenSkyFromLocalData(data) {
     }
 }
 
+const CMB_LAT = 7.1802;
+const CMB_LON = 79.8837;
+
+function getDistanceToCMB(lat, lon) {
+    if (lat === undefined || lon === undefined) return 999999;
+    const dLat = lat - CMB_LAT;
+    const dLon = lon - CMB_LON;
+    return Math.sqrt(dLat * dLat + dLon * dLon);
+}
+
 function updateFlightDetailsUI() {
     const listContainer = document.getElementById('flight-details-list');
-    if (!listContainer) return;
-    listContainer.innerHTML = '';
-    if (flightsList.length > 0) {
-        flightsList.forEach(flight => {
-            const item = document.createElement('div');
-            item.className = 'flight-detail-item';
-            
-            const emergencyVal = (flight.emergency || 'none').toUpperCase();
-            const emergencyClass = (flight.emergency || 'none') !== 'none' ? 'emerg-warn' : '';
-            
-            // Build dual-column HUD structure
-            item.innerHTML = `
-                <div class="flight-detail-header">
-                    <span class="flight-detail-callsign">${flight.callsign || 'N/A'}</span>
-                    <span class="flight-detail-hex">#${(flight.icao24 || '').toUpperCase()}</span>
-                </div>
-                <div class="flight-detail-body">
-                    <div class="flight-detail-col left-col">
-                        <div class="flight-detail-row"><span>ALTITUDE:</span><span class="val">${flight.altitude || 0}m</span></div>
-                        <div class="flight-detail-row"><span>SPEED:</span><span class="val">${flight.speed || 0}km/h</span></div>
-                        <div class="flight-detail-row"><span>HEADING:</span><span class="val">${flight.track || 0}°</span></div>
-                        <div class="flight-detail-row"><span>INFO:</span><span class="val" style="font-size: 8px;">${flight.country || 'N/A'}</span></div>
+    const fidsContainer = document.getElementById('fids-table-body');
+    
+    // Sort flights by proximity to Katunayake (CMB)
+    const sortedFlights = [...flightsList].sort((a, b) => {
+        return getDistanceToCMB(a.latitude, a.longitude) - getDistanceToCMB(b.latitude, b.longitude);
+    });
+
+    // 1. Update the sidebar list panel with closest flights
+    if (listContainer) {
+        listContainer.innerHTML = '';
+        if (sortedFlights.length > 0) {
+            sortedFlights.forEach(flight => {
+                const item = document.createElement('div');
+                item.className = 'flight-detail-item';
+                
+                const emergencyVal = (flight.emergency || 'none').toUpperCase();
+                const emergencyClass = (flight.emergency || 'none') !== 'none' ? 'emerg-warn' : '';
+                
+                item.innerHTML = `
+                    <div class="flight-detail-header">
+                        <span class="flight-detail-callsign">${flight.callsign || 'N/A'}</span>
+                        <span class="flight-detail-hex">#${(flight.icao24 || '').toUpperCase()}</span>
                     </div>
-                    <div class="flight-detail-col right-col">
-                        <div class="flight-detail-row"><span>EMERGENCY:</span><span class="val ${emergencyClass}">${emergencyVal}</span></div>
-                        <div class="flight-detail-row"><span>MACH SPD:</span><span class="val">${flight.mach || 'N/A'}</span></div>
-                        <div class="flight-detail-row"><span>AIR TEMP:</span><span class="val">${flight.temp || 'N/A'}</span></div>
-                        <div class="flight-detail-row"><span>WIND VEL:</span><span class="val" style="font-size: 7.5px;">${flight.wind || 'N/A'}</span></div>
-                        <div class="flight-detail-row"><span>MCP ALT:</span><span class="val">${flight.mcpAlt || 'N/A'}</span></div>
+                    <div class="flight-detail-body">
+                        <div class="flight-detail-col left-col">
+                            <div class="flight-detail-row"><span>ALTITUDE:</span><span class="val">${flight.altitude || 0}m</span></div>
+                            <div class="flight-detail-row"><span>SPEED:</span><span class="val">${flight.speed || 0}km/h</span></div>
+                            <div class="flight-detail-row"><span>HEADING:</span><span class="val">${flight.track || 0}°</span></div>
+                            <div class="flight-detail-row"><span>INFO:</span><span class="val" style="font-size: 8px;">${flight.country || 'N/A'}</span></div>
+                        </div>
+                        <div class="flight-detail-col right-col">
+                            <div class="flight-detail-row"><span>EMERGENCY:</span><span class="val ${emergencyClass}">${emergencyVal}</span></div>
+                            <div class="flight-detail-row"><span>MACH SPD:</span><span class="val">${flight.mach || 'N/A'}</span></div>
+                            <div class="flight-detail-row"><span>AIR TEMP:</span><span class="val">${flight.temp || 'N/A'}</span></div>
+                            <div class="flight-detail-row"><span>WIND VEL:</span><span class="val" style="font-size: 7.5px;">${flight.wind || 'N/A'}</span></div>
+                            <div class="flight-detail-row"><span>MCP ALT:</span><span class="val">${flight.mcpAlt || 'N/A'}</span></div>
+                        </div>
                     </div>
-                </div>
+                `;
+                listContainer.appendChild(item);
+            });
+        } else {
+            listContainer.innerHTML = '<div class="flight-detail-item empty">SCANNING AIRSPACE...</div>';
+        }
+    }
+
+    // 2. Update the horizontal Timetable Board (FIDS) - Top 6 closest flights (Real data only)
+    if (fidsContainer) {
+        fidsContainer.innerHTML = '';
+        
+        if (sortedFlights.length > 0) {
+            const displayList = sortedFlights.slice(0, 6);
+            displayList.forEach(flight => {
+                const tr = document.createElement('tr');
+                
+                let statusText = 'CRUISING';
+                let statusClass = 'cruising';
+                let flightType = 'ARR';
+                let flightRoute = 'DXB ➔ CMB';
+                let flightTime = '00:00';
+                
+                // Determine Flight Type and Route based on origin/destination
+                if (flight.origin === "CMB" || (flight.origin && flight.origin.toUpperCase() === "CMB")) {
+                    flightType = "DEP";
+                    flightRoute = `CMB ➔ ${flight.destination || "SIN"}`;
+                } else if (flight.destination === "CMB" || (flight.destination && flight.destination.toUpperCase() === "CMB")) {
+                    flightType = "ARR";
+                    flightRoute = `${flight.origin || "DXB"} ➔ CMB`;
+                } else {
+                    // Heuristic route parsing based on track/heading
+                    const track = flight.track || 0;
+                    const callsign = (flight.callsign || "").trim().toUpperCase();
+                    if (track > 45 && track <= 225) {
+                        flightType = "DEP";
+                        let dest = "SIN";
+                        if (callsign.startsWith("UL")) dest = "SIN";
+                        else if (callsign.startsWith("SQ")) dest = "SIN";
+                        else if (callsign.startsWith("MH")) dest = "KUL";
+                        else if (callsign.startsWith("AI")) dest = "MAA";
+                        flightRoute = `CMB ➔ ${dest}`;
+                    } else {
+                        flightType = "ARR";
+                        let orig = "DXB";
+                        if (callsign.startsWith("UL")) orig = "DXB";
+                        else if (callsign.startsWith("EK")) orig = "DXB";
+                        else if (callsign.startsWith("QR")) orig = "DOH";
+                        else if (callsign.startsWith("EY")) orig = "AUH";
+                        flightRoute = `${orig} ➔ CMB`;
+                    }
+                }
+
+                // Dynamically calculate EST time
+                const now = new Date();
+                const dist = getDistanceToCMB(flight.latitude, flight.longitude);
+                if (flightType === "ARR") {
+                    const minsToAdd = Math.max(5, Math.round(dist * 60)); // 60 mins per degree (~1 hour travel)
+                    now.setMinutes(now.getMinutes() + minsToAdd);
+                } else {
+                    const minsToSub = Math.max(2, Math.round(dist * 30));
+                    now.setMinutes(now.getMinutes() - minsToSub);
+                }
+                flightTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+                // Calculate Status Text
+                if ((flight.emergency || 'none') !== 'none') {
+                    statusText = 'EMERGENCY';
+                    statusClass = 'emergency';
+                } else if (flight.altitude < 4000) {
+                    statusText = 'DESCENDING';
+                    statusClass = 'descending';
+                } else if (flight.altitude >= 4000 && flight.altitude < 8500) {
+                    statusText = 'CLIMBING';
+                    statusClass = 'climbing';
+                }
+                
+                let aircraftDetails = flight.country || 'N/A';
+                if (aircraftDetails.startsWith('TYPE:')) {
+                    aircraftDetails = aircraftDetails.replace('TYPE: ', '').replace(' | REG:', ' (Reg: ') + ')';
+                }
+                
+                tr.innerHTML = `
+                    <td style="color: var(--neon-blue); font-weight: bold;">${flight.callsign || 'N/A'}</td>
+                    <td><span style="color: ${flightType === 'DEP' ? '#ffd60a' : '#00f3ff'}; font-size: 8px; border: 1px solid ${flightType === 'DEP' ? 'rgba(255,214,10,0.3)' : 'rgba(0,243,255,0.3)'}; padding: 1px 3px; border-radius: 2px;">${flightType}</span></td>
+                    <td style="font-weight: bold; color: #ffffff;">${flightRoute}</td>
+                    <td style="color: rgba(255,255,255,0.85);">${flightTime}</td>
+                    <td style="color: rgba(255,255,255,0.6);">${aircraftDetails}</td>
+                    <td><span class="status-tag ${statusClass}">${statusText}</span></td>
+                `;
+                fidsContainer.appendChild(tr);
+            });
+        } else {
+            fidsContainer.innerHTML = `
+                <tr>
+                    <td colspan="6" class="empty">NO ACTIVE TRAFFIC IN REGION</td>
+                </tr>
             `;
-            listContainer.appendChild(item);
-        });
-    } else {
-        listContainer.innerHTML = '<div class="flight-detail-item empty">SCANNING AIRSPACE...</div>';
+        }
     }
 }
 
@@ -330,8 +441,8 @@ function drawRadar() {
     // 2b. Draw geographical sectors
     ctx.fillStyle = 'rgba(0, 243, 255, 0.15)';
     ctx.font = '8px "Share Tech Mono"';
-    ctx.fillText("N-EAST ZONE", cx - maxRadius + 15, cy - maxRadius + 20);
-    ctx.fillText("BADULLA SECTOR (ACTIVE)", cx + 15, cy - 10);
+    ctx.fillText("WESTERN ZONE", cx - maxRadius + 15, cy - maxRadius + 20);
+    ctx.fillText("KATUNAYAKE SECTOR (BIA / CMB)", cx + 15, cy - 10);
     ctx.fillText("S-WEST ZONE", cx - maxRadius + 15, cy + maxRadius - 15);
     ctx.fillText("S-EAST ZONE", cx + maxRadius - 95, cy + maxRadius - 15);
     
@@ -457,6 +568,66 @@ function updateLocalDataUI(data) {
     }
 }
 
+function updateAirportScheduleUI(scheduleData) {
+    const fidsContainer = document.getElementById('fids-table-body');
+    if (!fidsContainer) return;
+    fidsContainer.innerHTML = '';
+
+    if (!scheduleData || scheduleData.length === 0) {
+        fidsContainer.innerHTML = `<tr><td colspan="6" class="empty">NO SCHEDULE DATA AVAILABLE</td></tr>`;
+        return;
+    }
+
+    // Sort by scheduled time, show next 6 upcoming flights
+    const now = new Date();
+    const nowMins = now.getHours() * 60 + now.getMinutes();
+
+    const sorted = [...scheduleData].sort((a, b) => {
+        const toMins = t => {
+            if (!t || t === '--:--') return 9999;
+            const [h, m] = t.split(':').map(Number);
+            return h * 60 + m;
+        };
+        return toMins(a.scheduled_time) - toMins(b.scheduled_time);
+    });
+
+    // Show 6: prefer upcoming or wrap around to earliest
+    const upcoming = sorted.filter(f => {
+        if (!f.scheduled_time || f.scheduled_time === '--:--') return false;
+        const [h, m] = f.scheduled_time.split(':').map(Number);
+        return (h * 60 + m) >= nowMins - 15; // include flights from 15 mins ago (may still be landing)
+    });
+    const displayList = upcoming.length > 0 ? upcoming.slice(0, 6) : sorted.slice(0, 6);
+
+    displayList.forEach(flight => {
+        const tr = document.createElement('tr');
+
+        const isArr = flight.type === 'ARR';
+        const typeColor = isArr ? '#00f3ff' : '#ffd60a';
+        const typeBorder = isArr ? 'rgba(0,243,255,0.3)' : 'rgba(255,214,10,0.3)';
+
+        const route = isArr ? `${flight.city || '---'} ➔ CMB` : `CMB ➔ ${flight.city || '---'}`;
+
+        // Status class mapping
+        const statusLower = (flight.status || 'SCHEDULED').toUpperCase();
+        let statusClass = 'cruising';
+        if (statusLower.includes('LAND') || statusLower.includes('ARR')) statusClass = 'descending';
+        else if (statusLower.includes('DEPART') || statusLower.includes('BOARD') || statusLower.includes('GATE')) statusClass = 'climbing';
+        else if (statusLower.includes('CANCEL')) statusClass = 'emergency';
+        else if (statusLower.includes('DELAY')) statusClass = 'climbing';
+
+        tr.innerHTML = `
+            <td style="color: var(--neon-blue); font-weight: bold;">${flight.callsign || 'N/A'}</td>
+            <td><span style="color: ${typeColor}; font-size: 8px; border: 1px solid ${typeBorder}; padding: 1px 3px; border-radius: 2px;">${flight.type}</span></td>
+            <td style="font-weight: bold; color: #ffffff;">${route}</td>
+            <td style="color: rgba(255,255,255,0.85);">${flight.scheduled_time}</td>
+            <td style="color: rgba(255,255,255,0.6);">${flight.callsign || ''}</td>
+            <td><span class="status-tag ${statusClass}">${flight.status || 'SCHEDULED'}</span></td>
+        `;
+        fidsContainer.appendChild(tr);
+    });
+}
+
 function reloadScheduleScript() {
     const oldScript = document.getElementById('data-script');
     if (oldScript) {
@@ -470,10 +641,15 @@ function reloadScheduleScript() {
         if (window.jarvis_data) {
             updateLocalDataUI(window.jarvis_data);
             mergeOpenSkyFromLocalData(window.jarvis_data);
+            // Populate FIDS timetable with real airport.lk schedule
+            if (window.jarvis_data.airport_schedule) {
+                updateAirportScheduleUI(window.jarvis_data.airport_schedule);
+            }
         }
     };
     document.head.appendChild(script);
 }
+
 
 // Initial triggers
 updateLocalClock();
