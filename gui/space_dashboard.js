@@ -438,17 +438,17 @@ function renderEarthquakes(features) {
     const list = document.getElementById('quake-list');
     const badge = document.getElementById('quake-alert-badge');
     
-    // Sort by magnitude descending, take top 10
+    // Sort by time descending (most recent first), take top 10
     const sorted = features
         .filter(f => f.properties.mag >= 4.0)
-        .sort((a, b) => b.properties.mag - a.properties.mag)
+        .sort((a, b) => b.properties.time - a.properties.time)
         .slice(0, 10);
     
     const hasMajor = sorted.some(f => f.properties.mag >= 6.0);
     if (badge) badge.style.display = hasMajor ? 'flex' : 'none';
     
-    // Update canvas earthquake markers (top 8 by mag)
-    earthquakeMarkers = sorted.slice(0, 8).map(f => ({
+    // Update canvas earthquake markers (all 10 from the sorted list)
+    earthquakeMarkers = sorted.map(f => ({
         lat: f.geometry.coordinates[1],
         lon: f.geometry.coordinates[0],
         mag: f.properties.mag
@@ -467,12 +467,21 @@ function renderEarthquakes(features) {
         const isMajor = p.mag >= 6.0;
         const place = p.place || 'Unknown Region';
         const depth = f.geometry.coordinates[2].toFixed(0);
+        
+        // Format API epoch time (milliseconds) to readable UTC string
+        const dateObj = new Date(p.time);
+        const mm = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+        const dd = String(dateObj.getUTCDate()).padStart(2, '0');
+        const hh = String(dateObj.getUTCHours()).padStart(2, '0');
+        const min = String(dateObj.getUTCMinutes()).padStart(2, '0');
+        const timeStr = `${mm}/${dd} ${hh}:${min} UTC`;
+
         const item = document.createElement('div');
         item.className = 'quake-item';
         item.innerHTML = `
             <span class="quake-mag${isMajor ? ' major' : ''}">M${mag}</span>
             <span class="quake-place">${place}</span>
-            <span class="quake-depth">DEPTH: ${depth} km</span>
+            <span class="quake-depth">DEPTH: ${depth} km | ${timeStr}</span>
         `;
         frag.appendChild(item);
     });
