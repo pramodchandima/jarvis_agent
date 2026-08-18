@@ -24,7 +24,7 @@ schedule_cache = []
 last_schedule_fetch = 0.0
 
 def fetch_flightradar_flights():
-    """Fetch live flights from OpenSky Network for Sri Lanka bounds (CORS-proof)"""
+    """Fetch aircraft around CMB, with ADSB.lol as a fallback for FlightRadar24."""
     global flight_cache, last_flight_fetch
     now = time.time()
     # Cache and pull once every 20 seconds
@@ -32,46 +32,32 @@ def fetch_flightradar_flights():
         return flight_cache
         
     try:
-        # Sri Lanka bounds: North=10.0, South=5.5, West=79.0, East=82.5
-        # OpenSky uses lamin, lomin, lamax, lomax
-        url = "https://opensky-network.org/api/states/all?lamin=5.5&lomin=79.0&lamax=10.0&lomax=82.5"
+        # 200 NM around CMB: North, South, West, East.  Keep this aligned with
+        # gui/dashboard.js so the backend does not omit aircraft the radar can draw.
+        url = "https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds=10.52,3.85,76.52,83.25&adsb=1&air=1"
         req = urllib.request.Request(url, headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "application/json"
         })
         with urllib.request.urlopen(req, timeout=12) as response:
             res_data = json.loads(response.read().decode('utf-8'))
             temp_list = []
-            states = res_data.get("states", []) or []
-            for s in states:
-                if len(s) > 10:
-                    icao24 = s[0]
-                    callsign = (s[1] or "").strip() or "N/A"
-                    origin_country = s[2] or "N/A"
-                    lon = s[5]
-                    lat = s[6]
-                    alt = s[7] # altitude in meters
-                    speed_ms = s[9] # velocity in m/s
-                    track = s[10] or 0
-                    
-                    if lon is None or lat is None:
-                        continue
-                        
-                    # Calculate emergency from squawk (s[14])
-                    squawk = s[14] if len(s) > 14 else None
-                    emergency = "general" if squawk == "7700" else "none"
-                    
+            for key, val in res_data.items():
+                if key in ("full_count", "version"):
+                    continue
+                if isinstance(val, list) and len(val) > 13:
                     temp_list.append({
-                        "icao24": icao24,
-                        "callsign": callsign,
-                        "country": f"Origin: {origin_country}",
-                        "origin": "CMB",
-                        "destination": "CMB",
-                        "longitude": lon,
-                        "latitude": lat,
-                        "altitude": round(alt) if alt is not None else 0,
-                        "speed": round(speed_ms * 3.6) if speed_ms is not None else 0, # convert m/s to km/h
-                        "track": round(track),
-                        "emergency": emergency,
+                        "icao24": val[0],
+                        "callsign": (val[16] or "").strip() or "N/A",
+                        "country": f"TYPE: {val[8] or 'N/A'} | REG: {val[9] or 'N/A'}",
+                        "origin": val[11] or "N/A",
+                        "destination": val[12] or "N/A",
+                        "longitude": val[2],
+                        "latitude": val[1],
+                        "altitude": round(val[4] * 0.3048) if val[4] is not None else 0, # Convert feet to meters
+                        "speed": round(val[5] * 1.852) if val[5] is not None else 0, # Convert knots to km/h
+                        "track": val[3] or 0,
+                        "emergency": "none",
                         "mach": "N/A",
                         "temp": "N/A",
                         "wind": "N/A",
@@ -81,6 +67,53 @@ def fetch_flightradar_flights():
             last_flight_fetch = now
     except Exception:
         pass
+
+    # FlightRadar24's feed is undocumented and can reject requests.  Use a
+    # second public ADS-B source so data.js remains useful when that happens.
+    if not flight_cache:
+        try:
+            url = "https://api.adsb.lol/v2/lat/7.1802/lon/79.8837/dist/200"
+            req = urllib.request.Request(url, headers={
+                "User-Agent": "JARVIS-Dashboard/1.0",
+                "Accept": "application/json"
+            })
+            with urllib.request.urlopen(req, timeout=12) as response:
+                aircraft = json.loads(response.read().decode("utf-8")).get("ac", [])
+
+            fallback_flights = []
+            for ac in aircraft:
+                lat, lon = ac.get("lat"), ac.get("lon")
+                if not isinstance(lat, (int, float)) or not isinstance(lon, (int, float)):
+                    continue
+                if not (3.85 <= lat <= 10.52 and 76.52 <= lon <= 83.25):
+                    continue
+
+                altitude_ft = ac.get("alt_baro")
+                if not isinstance(altitude_ft, (int, float)):
+                    altitude_ft = ac.get("alt_geom")
+                groundspeed = ac.get("gs")
+                fallback_flights.append({
+                    "icao24": ac.get("hex", "unknown"),
+                    "callsign": (ac.get("flight") or "").strip() or "N/A",
+                    "country": f"TYPE: {ac.get('t') or 'N/A'} | REG: {ac.get('r') or 'N/A'}",
+                    "origin": "N/A",
+                    "destination": "N/A",
+                    "longitude": lon,
+                    "latitude": lat,
+                    "altitude": round(altitude_ft * 0.3048) if isinstance(altitude_ft, (int, float)) else 0,
+                    "speed": round(groundspeed * 1.852) if isinstance(groundspeed, (int, float)) else 0,
+                    "track": ac.get("track") or 0,
+                    "emergency": ac.get("emergency") or "none",
+                    "mach": f"{ac['mach']:.2f}" if isinstance(ac.get("mach"), (int, float)) else "N/A",
+                    "temp": f"{ac['oat']}°C" if isinstance(ac.get("oat"), (int, float)) else "N/A",
+                    "wind": "N/A",
+                    "mcpAlt": "N/A"
+                })
+            if fallback_flights:
+                flight_cache = fallback_flights
+                last_flight_fetch = now
+        except Exception:
+            pass
     return flight_cache
 
 def _clean_html(s):
