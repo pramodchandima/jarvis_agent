@@ -5,8 +5,6 @@ Handles voice recognition, AI logic, and system interactions efficiently.
 """
 import asyncio
 import sys
-import time
-import os
 import re
 import queue
 import threading
@@ -192,7 +190,7 @@ async def main():
             jarvis_is_speaking = True
 
             # INTELLIGENT REQUEST ANALYSIS PHASE
-            request_complexity, needs_clarification = analyze_request_complexity(user_text_str)
+            request_complexity, _ = analyze_request_complexity(user_text_str)
 
             # Wake word and session checking
             wake_words = getattr(config, 'WAKE_WORDS', [])
