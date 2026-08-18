@@ -421,14 +421,29 @@ function drawRadar() {
     const cy = canvas.height / 2;
     const maxRadius = Math.min(canvas.width - panelWidth, canvas.height) * 0.45;
     
-    // 1. Draw concentric grid circles
+    // 1. Draw concentric grid circles with labels
     ctx.strokeStyle = 'rgba(0, 243, 255, 0.1)';
     ctx.lineWidth = 1;
-    for (let r = maxRadius / 4; r <= maxRadius; r += maxRadius / 4) {
+    ctx.fillStyle = 'rgba(0, 243, 255, 0.5)';
+    ctx.font = '8px "Share Tech Mono"';
+    ctx.textAlign = 'left';
+
+    const ringLabels = [
+        "DOMESTIC (LANDMASS)",
+        "TERRITORIAL SEA (12 NM)",
+        "APPROACH ZONE (150 NM)",
+        "OUTER BOUNDARY (200 NM)"
+    ];
+
+    const rings = [maxRadius / 4, maxRadius / 2, maxRadius * 0.75, maxRadius];
+    rings.forEach((r, idx) => {
         ctx.beginPath();
         ctx.arc(cx, cy, r, 0, Math.PI * 2);
         ctx.stroke();
-    }
+        
+        // Draw label text just above the circle line on the horizontal axis
+        ctx.fillText(ringLabels[idx], cx + 5, cy - r - 4);
+    });
     
     // 2. Draw crosshairs
     ctx.beginPath();
