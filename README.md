@@ -36,9 +36,15 @@
 
 ### 🌐 AI Cognitive Network Dashboard
 Live Jarvis status with airspace radar, weather data, and system telemetry.
+<p align="center">
+  <img src="assets/AI%20COGNITIVE%20NETWORK.png" alt="AI Cognitive Network Dashboard" width="800">
+</p>
 
 ### 🛰️ Orbital Telemetry Core
 A real-time global intelligence HUD featuring:
+<p align="center">
+  <img src="assets/ORBITAL%20TELEMETRY%20CORE.png" alt="Orbital Telemetry Core Dashboard" width="800">
+</p>
 
 | Panel | Data Source | Refresh |
 |-------|-------------|---------|
