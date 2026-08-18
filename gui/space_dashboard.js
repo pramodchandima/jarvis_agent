@@ -34,16 +34,18 @@ const WORLD_VECTORS = [
 function resizeCanvases() {
     if (quakeCanvas && quakeCanvas.parentElement) {
         const rect = quakeCanvas.parentElement.getBoundingClientRect();
-        quakeCanvas.width = rect.width;
-        quakeCanvas.height = rect.height;
+        quakeCanvas.width = Math.max(1, Math.floor(rect.width));
+        quakeCanvas.height = Math.max(1, Math.floor(rect.height));
     }
     if (issCanvas && issCanvas.parentElement) {
         const rect = issCanvas.parentElement.getBoundingClientRect();
-        issCanvas.width = rect.width;
-        issCanvas.height = rect.height;
+        issCanvas.width = Math.max(1, Math.floor(rect.width));
+        issCanvas.height = Math.max(1, Math.floor(rect.height));
     }
 }
 window.addEventListener('resize', resizeCanvases, { passive: true });
+if (quakeCanvas?.parentElement) new ResizeObserver(resizeCanvases).observe(quakeCanvas.parentElement);
+if (issCanvas?.parentElement) new ResizeObserver(resizeCanvases).observe(issCanvas.parentElement);
 resizeCanvases();
 
 function gpsToPixels(lon, lat, canvas) {
