@@ -90,6 +90,32 @@
 
             <!-- Center Column: Active Airspace Radar Grid -->
             <div class="grid-col center-stage">
+                <!-- 09: Flight Telemetry Timetable -->
+                <div class="card timetable-card tech-card">
+                    <div class="tech-corner tl"></div><div class="tech-corner tr"></div>
+                    <div class="hud-num">09</div>
+                    <div class="hud-lbl">// FLIGHT TELEMETRY & TIMETABLE BOARD</div>
+                    <div class="timetable-wrapper">
+                        <table class="fids-table">
+                            <thead>
+                                <tr>
+                                    <th>FLIGHT</th>
+                                    <th>TYPE</th>
+                                    <th>ROUTE</th>
+                                    <th>TIME</th>
+                                    <th>AIRCRAFT & REG</th>
+                                    <th>STATUS</th>
+                                </tr>
+                            </thead>
+                            <tbody id="fids-table-body">
+                                <tr>
+                                    <td colspan="6" class="empty">NO ACTIVE TRAFFIC IN REGION</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
                 <div class="card radar-card tech-card">
                     <div class="tech-corner tl"></div><div class="tech-corner bl"></div><div class="tech-corner tr"></div><div class="tech-corner br"></div>
                     <div class="hud-lbl">// ACTIVE AIRSPACE RADAR MAP</div>
