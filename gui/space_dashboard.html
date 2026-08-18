@@ -4,23 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>J.A.R.V.I.S. Orbital Telemetry Core</title>
+    <link rel="stylesheet" href="shared.css">
     <link rel="stylesheet" href="space_dashboard.css">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <script src="components.js" defer></script>
 </head>
 <body>
     <div class="scanlines"></div>
     <div class="main-terminal">
         <!-- Header -->
-        <div class="terminal-header">
-            <div class="status-indicator">
-                <span class="pulse-ring"></span>
-                <span class="hud-title">J.A.R.V.I.S. // ORBITAL TELEMETRY CORE</span>
-            </div>
-            <div class="header-right">
-                <div class="header-badge" id="quake-alert-badge" style="display:none;">⚠ SEISMIC ALERT</div>
-                <div class="timezone-hud" id="timezone-lbl">UTC</div>
-            </div>
-        </div>
+        <terminal-header title="J.A.R.V.I.S. // ORBITAL TELEMETRY CORE">
+            <div class="header-badge" id="quake-alert-badge" style="display:none;">⚠ SEISMIC ALERT</div>
+            <div class="timezone-hud" id="timezone-lbl">UTC</div>
+        </terminal-header>
 
         <!-- Layout Grid -->
         <div class="hud-grid">
@@ -29,30 +25,23 @@
             <div class="grid-col left-sidebar">
 
                 <!-- 01: NASA APOD -->
-                <div class="card tech-card apod-card">
-                    <div class="tech-corner tl"></div><div class="tech-corner tr"></div>
-                    <div class="hud-num">01</div>
-                    <div class="hud-lbl">// NASA ASTRONOMY PICTURE OF THE DAY</div>
+                <tech-card num="01" label="// NASA ASTRONOMY PICTURE OF THE DAY" ext-class="apod-card" corners="tl,tr">
                     <div class="apod-body">
                         <div class="apod-title" id="apod-title">LOADING...</div>
                         <div class="apod-desc" id="apod-desc">Fetching cosmic data...</div>
                         <div class="apod-copyright" id="apod-copyright"></div>
                     </div>
-                </div>
+                </tech-card>
 
                 <!-- 02: Space Crew Registry -->
-                <div class="card tech-card crew-card">
-                    <div class="hud-num">02</div>
-                    <div class="hud-lbl">// ORBITAL CREW REGISTRY</div>
+                <tech-card num="02" label="// ORBITAL CREW REGISTRY" ext-class="crew-card">
                     <div class="crew-list" id="crew-list">
                         <div class="crew-item empty">LOADING REGISTRY...</div>
                     </div>
-                </div>
+                </tech-card>
 
                 <!-- 03: Space Storm Scales -->
-                <div class="card tech-card storm-card">
-                    <div class="hud-num">03</div>
-                    <div class="hud-lbl">// NOAA SPACE WEATHER ALERT STATUS</div>
+                <tech-card num="03" label="// NOAA SPACE WEATHER ALERT STATUS" ext-class="storm-card">
                     <div class="storm-stats">
                         <div class="storm-row">
                             <span class="storm-lbl">GEOMAGNETIC (G):</span>
@@ -67,13 +56,10 @@
                             <span class="storm-val" id="radio-lbl">R0 - NORMAL</span>
                         </div>
                     </div>
-                </div>
+                </tech-card>
 
                 <!-- 04: Solar Flux Core -->
-                <div class="card tech-card solar-card">
-                    <div class="tech-corner bl"></div><div class="tech-corner br"></div>
-                    <div class="hud-num">04</div>
-                    <div class="hud-lbl">// SOLAR WIND CORE</div>
+                <tech-card num="04" label="// SOLAR WIND CORE" ext-class="solar-card" corners="bl,br">
                     <div class="solar-stats">
                         <div class="solar-row">
                             <span class="solar-lbl">SOLAR WIND SPEED:</span>
@@ -84,16 +70,14 @@
                             <span class="solar-val" id="kp-index-lbl">-- Kp</span>
                         </div>
                     </div>
-                </div>
+                </tech-card>
 
             </div>
 
             <!-- Center Column -->
             <div class="grid-col center-stage">
                 <!-- Row 1: Seismic Activity -->
-                <div class="card split-map-card tech-card">
-                    <div class="tech-corner tl"></div><div class="tech-corner tr"></div><div class="tech-corner bl"></div><div class="tech-corner br"></div>
-                    <div class="hud-lbl">// SEISMIC ACTIVITY CORE — LAT/LON GRAPH</div>
+                <tech-card label="// SEISMIC ACTIVITY CORE — LAT/LON GRAPH" ext-class="split-map-card" corners="tl,tr,bl,br">
                     <div class="split-map-container">
                         <div class="map-wrapper">
                             <canvas id="quake-canvas"></canvas>
@@ -104,12 +88,10 @@
                             </div>
                         </div>
                     </div>
-                </div>
+                </tech-card>
 
                 <!-- Row 2: Orbital Telemetry -->
-                <div class="card split-map-card tech-card">
-                    <div class="tech-corner tl"></div><div class="tech-corner tr"></div><div class="tech-corner bl"></div><div class="tech-corner br"></div>
-                    <div class="hud-lbl">// ORBITAL TELEMETRY CORE — ISS LIVE TRACKER</div>
+                <tech-card label="// ORBITAL TELEMETRY CORE — ISS LIVE TRACKER" ext-class="split-map-card" corners="tl,tr,bl,br">
                     <div class="split-map-container">
                         <div class="map-wrapper">
                             <canvas id="iss-canvas"></canvas>
@@ -120,17 +102,14 @@
                             </div>
                         </div>
                     </div>
-                </div>
+                </tech-card>
             </div>
 
             <!-- Right Column -->
             <div class="grid-col right-sidebar">
 
                 <!-- 08: Orbit Environment -->
-                <div class="card tech-card env-card">
-                    <div class="tech-corner bl"></div><div class="tech-corner br"></div>
-                    <div class="hud-num">08</div>
-                    <div class="hud-lbl">// ORBIT ENVIRONMENTAL STATUS</div>
+                <tech-card num="08" label="// ORBIT ENVIRONMENTAL STATUS" ext-class="env-card" corners="bl,br">
                     <div class="env-stats">
                         <div class="env-row">
                             <span class="env-lbl">LIGHT PHASE:</span>
@@ -145,12 +124,10 @@
                             <span class="env-val" id="solar-lon-lbl">--°</span>
                         </div>
                     </div>
-                </div>
+                </tech-card>
 
                 <!-- 09: Maritime Vessel Tracker -->
-                <div class="card tech-card maritime-card">
-                    <div class="hud-num">09</div>
-                    <div class="hud-lbl">// MARITIME ACTIVITY CORE</div>
+                <tech-card num="09" label="// MARITIME ACTIVITY CORE" ext-class="maritime-card">
                     <div class="maritime-stats" id="maritime-stats">
                         <div class="maritime-row">
                             <span class="maritime-lbl">GLOBAL VESSEL TRAFFIC:</span>
@@ -169,7 +146,7 @@
                             <span class="maritime-val text-neon" id="malacca-lbl">CLEAR</span>
                         </div>
                     </div>
-                </div>
+                </tech-card>
 
             </div>
 
@@ -207,6 +184,6 @@
     <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/satellite.js/4.0.0/satellite.min.js"></script>
     <script id="data-script"></script>
-    <script src="space_dashboard.js"></script>
+    <script src="space_dashboard.js" defer></script>
 </body>
 </html>
