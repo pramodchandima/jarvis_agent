@@ -1,0 +1,212 @@
+:root {
+    --bg-color: #020509; /* From dashboard */
+    --card-bg: rgba(6, 20, 38, 0.45); /* From space */
+    --neon-blue: #00f3ff;
+    --neon-blue-glow: rgba(0, 243, 255, 0.4);
+    --neon-blue-dark: rgba(0, 243, 255, 0.04);
+    --glass-bg: rgba(4, 12, 24, 0.65); /* From dashboard */
+    --glass-border: rgba(0, 243, 255, 0.12);
+    
+    --neon-red: #ff3b30;
+    --neon-orange: #ff9500;
+    --neon-green: #34c759;
+    --neon-gold: #ffd60a;
+    
+    --font-sans: 'Outfit', sans-serif;
+    --font-mono: 'Share Tech Mono', monospace;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* Let the rendered card remain the direct flex item in dashboard columns. */
+tech-card {
+    display: contents;
+}
+
+body {
+    background-color: var(--bg-color);
+    font-family: var(--font-sans);
+    color: #ffffff;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-image: radial-gradient(circle at 50% 50%, rgba(0, 243, 255, 0.03) 0%, transparent 60%);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeSpeed;
+}
+
+/* CRT scanlines overlay */
+.scanlines {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.15) 50%), 
+                linear-gradient(90deg, rgba(0, 243, 255, 0.02), rgba(0, 243, 255, 0.01), rgba(0, 243, 255, 0.02));
+    background-size: 100% 4px, 6px 100%;
+    z-index: 999;
+    pointer-events: none;
+}
+
+.main-terminal {
+    width: 100%;
+    height: 100%;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Header HUD */
+.terminal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid var(--neon-blue); /* standardizing to neon-blue */
+    padding-bottom: 10px;
+    box-shadow: 0 4px 20px rgba(0, 243, 255, 0.05);
+    flex-shrink: 0;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.pulse-ring {
+    width: 10px;
+    height: 10px;
+    background-color: var(--neon-blue);
+    border-radius: 50%;
+    box-shadow: 0 0 10px var(--neon-blue), 0 0 20px var(--neon-blue);
+    position: relative;
+}
+.pulse-ring::after {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border: 2px solid var(--neon-blue);
+    border-radius: 50%;
+    animation: ring-ripple 1.5s ease-out infinite;
+    top: -2px;
+    left: -2px;
+}
+@keyframes ring-ripple {
+    0% { transform: scale(1); opacity: 0.8; }
+    100% { transform: scale(2.2); opacity: 0; }
+}
+
+.hud-title {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    letter-spacing: 3px;
+    color: var(--neon-blue);
+    text-shadow: 0 0 10px var(--neon-blue-glow);
+}
+
+.timezone-hud {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: rgba(0, 243, 255, 0.6);
+    letter-spacing: 2px;
+    text-shadow: 0 0 8px var(--neon-blue-glow);
+}
+
+/* 3-Column HUD Grid */
+.hud-grid {
+    display: grid;
+    grid-template-columns: 310px 1fr 310px;
+    gap: 16px;
+    flex-grow: 1;
+    height: calc(100% - 40px);
+    min-height: 0;
+}
+
+.grid-col {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    height: 100%;
+    overflow: hidden;
+}
+
+.left-sidebar { justify-content: stretch; }
+.right-sidebar { justify-content: stretch; }
+.center-stage { justify-content: stretch; }
+
+/* Card glassmorphism & HUD Styling */
+.card {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 4px;
+    padding: 14px;
+    backdrop-filter: blur(14px);
+    box-shadow: inset 0 0 15px rgba(0, 243, 255, 0.02), 0 4px 15px rgba(0, 0, 0, 0.4);
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.19, 1, 0.22, 1);
+    contain: layout style;
+}
+.card:hover {
+    border-color: var(--neon-blue);
+    box-shadow: inset 0 0 20px rgba(0, 243, 255, 0.08), 0 0 15px rgba(0, 243, 255, 0.15);
+}
+
+/* HUD Panel Numbers (01 - 08) */
+.hud-num {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    font-family: var(--font-mono);
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--neon-blue);
+    text-shadow: 0 0 8px var(--neon-blue-glow);
+    opacity: 0.85;
+}
+
+.hud-lbl {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--neon-blue);
+    opacity: 0.85;
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid rgba(0, 243, 255, 0.12);
+    padding-bottom: 4px;
+    width: 100%;
+}
+
+/* Tech Corner Markings */
+.tech-card .tech-corner {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border: 1.5px solid var(--neon-blue);
+    pointer-events: none;
+    opacity: 0.8;
+}
+.tech-card .tech-corner.tl { top: -1px; left: -1px; border-right: none; border-bottom: none; }
+.tech-card .tech-corner.tr { top: -1px; right: -1px; border-left: none; border-bottom: none; }
+.tech-card .tech-corner.bl { bottom: -1px; left: -1px; border-right: none; border-top: none; }
+.tech-card .tech-corner.br { bottom: -1px; right: -1px; border-left: none; border-top: none; }
+
+.text-neon {
+    color: var(--neon-blue) !important;
+    text-shadow: 0 0 6px var(--neon-blue-glow) !important;
+}
