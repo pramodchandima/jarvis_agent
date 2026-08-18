@@ -1,21 +1,18 @@
 import asyncio
-import os
 import subprocess
-import webbrowser
 from typing import Optional
 from core.ui import console
 from audio.tts import speak_jarvis
 from tools import youtube_utils
 
 current_music_process: Optional[subprocess.Popen] = None
-music_task: Optional[asyncio.Task] = None
 
 from core.browser import find_chrome_path, launch_chrome, kill_chrome_by_profile
 
 
 async def play_music_task(query: str) -> None:
     """Search YouTube and play the video directly in a Chrome Guest tab (non-blocking)"""
-    global current_music_process, music_task  # pylint: disable=global-statement,invalid-name
+    global current_music_process  # pylint: disable=global-statement,invalid-name
     
     try:
         console.print(f"[bold cyan]System:[/] Searching for: [italic]{query}[/]")
