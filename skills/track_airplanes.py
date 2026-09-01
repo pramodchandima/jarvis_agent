@@ -55,44 +55,75 @@ def run():
     except Exception:
         pass # Fallback to default Sri Lanka bounds on any error
 
+    center_lat, center_lon = (lamin + lamax) / 2.0, (lomin + lomax) / 2.0
+
+    flight_details = []
+
+    # 1. Primary Source: FlightRadar24 (data-cloud endpoint)
     try:
-        # Format bounds for FlightRadar24 (North, South, West, East)
         bounds_str = f"{lamax:.2f},{lamin:.2f},{lomin:.2f},{lomax:.2f}"
-        url = f"https://data-live.flightradar24.com/zones/fcgi/feed.js?bounds={bounds_str}&adsb=1&air=1"
+        url = f"https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds={bounds_str}&adsb=1&air=1"
         
-        # We must use a standard browser User-Agent to avoid HTTP 403 Forbidden
         req = urllib.request.Request(url, headers={
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Accept": "application/json"
         })
         
-        with urllib.request.urlopen(req, timeout=10) as response:
+        with urllib.request.urlopen(req, timeout=8) as response:
             res_data = json.loads(response.read().decode('utf-8'))
             
-            flight_details = []
-            # FlightRadar24 returns aircraft inside a dictionary/list where keys are flight IDs
-            # and values are lists of flight details
             for key, val in res_data.items():
                 if key in ("full_count", "version"):
                     continue
-                # val is a list of parameters: [icao_24, lat, lon, track, alt, speed, squawk, radar, type, registration, ...]
                 if isinstance(val, list) and len(val) > 13:
-                    callsign = val[16] or "N/A"
+                    callsign = (val[16] or "").strip() or "N/A"
                     origin = val[11] or "Unknown"
                     destination = val[12] or "Unknown"
                     aircraft_type = val[8] or "Unknown"
                     altitude = f"{val[4]} ft" if val[4] is not None else "N/A"
                     speed = f"{val[5]} kts" if val[5] is not None else "N/A"
                     flight_details.append(f"• Flight {callsign} ({aircraft_type}) from {origin} to {destination}: Alt: {altitude}, Speed: {speed}")
-            
-            total_count = len(flight_details)
-            if total_count == 0:
-                return f"Currently, there are no active airplanes detected in {location_name} via FlightRadar24."
+    except Exception:
+        pass
+
+    # 2. Secondary Fallback Source: ADS-B.lol API (matching Dashboard Manager)
+    if not flight_details:
+        try:
+            url = f"https://api.adsb.lol/v2/lat/{center_lat:.4f}/lon/{center_lon:.4f}/dist/200"
+            req = urllib.request.Request(url, headers={
+                "User-Agent": "JARVIS-Agent/1.0",
+                "Accept": "application/json"
+            })
+            with urllib.request.urlopen(req, timeout=8) as response:
+                data = json.loads(response.read().decode('utf-8'))
+                aircraft = data.get("ac", [])
                 
-            summary = f"Found {total_count} active airplane(s) in {location_name}."
-            if flight_details:
-                summary += "\n" + "\n".join(flight_details[:15]) # Display top 15
-            return summary
-            
-    except Exception as e:
-        return f"Could not retrieve airplane data for {location_name} right now. FlightRadar24 might be experiencing issues: {e}"
+                for ac in aircraft:
+                    lat, lon = ac.get("lat"), ac.get("lon")
+                    if not isinstance(lat, (int, float)) or not isinstance(lon, (int, float)):
+                        continue
+                    if not (lamin <= lat <= lamax and lomin <= lon <= lomax):
+                        continue
+                        
+                    callsign = (ac.get("flight") or "").strip() or "N/A"
+                    ac_type = ac.get("t") or "Unknown"
+                    alt_ft = ac.get("alt_baro")
+                    if not isinstance(alt_ft, (int, float)):
+                        alt_ft = ac.get("alt_geom") or "N/A"
+                    else:
+                        alt_ft = f"{alt_ft} ft"
+                    speed_kts = ac.get("gs")
+                    speed_str = f"{speed_kts} kts" if isinstance(speed_kts, (int, float)) else "N/A"
+                    
+                    flight_details.append(f"• Flight {callsign} ({ac_type}): Alt: {alt_ft}, Speed: {speed_str}")
+        except Exception:
+            pass
+
+    total_count = len(flight_details)
+    if total_count == 0:
+        return f"Currently, there are no active airplanes detected in {location_name}."
+
+    summary = f"Found {total_count} active airplane(s) in {location_name}."
+    if flight_details:
+        summary += "\n" + "\n".join(flight_details[:15]) # Display top 15
+    return summary
