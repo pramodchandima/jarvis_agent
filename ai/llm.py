@@ -1,6 +1,7 @@
 import re
 import time
 import asyncio
+import threading
 from groq import Groq
 from rich.live import Live
 from rich.markdown import Markdown
@@ -29,7 +30,7 @@ async def get_jarvis_response(user_input: str, request_complexity: RequestComple
     Spawns speech feedback as soon as text is generated.
     """
     from audio.music_player import play_music_task, stop_music
-    from audio.tts import speak_jarvis
+    from audio.tts import speak_jarvis, generate_tts_audio, play_tts_audio
     from tools.dashboard_manager import show_dashboard, hide_dashboard
     from tools.space_dashboard_manager import show_space_dashboard, hide_space_dashboard
 
@@ -101,8 +102,8 @@ ADDITIONAL CAPABILITIES:
         + memory_context
     )
 
-    # Dynamically build messages chain from recent 6 items in DB to maintain session context
-    recent_logs = get_recent_conversations(limit=6)
+    # Dynamically build messages chain from recent 4 items in DB to maintain session context
+    recent_logs = get_recent_conversations(limit=4)
     messages_chain = [{"role": "system", "content": current_system}]
     for role, content in recent_logs:
         messages_chain.append({"role": role, "content": content})
@@ -116,6 +117,43 @@ ADDITIONAL CAPABILITIES:
         is_ollama_local = False
         if getattr(config, "GROQ_BASE_URL", None) and "11434" in config.GROQ_BASE_URL:
             is_ollama_local = True
+
+        speech_queue = asyncio.Queue()
+        # audio_queue buffers pre-generated TTS audio so playback has no gap between sentences
+        audio_queue = asyncio.Queue(maxsize=4)
+
+        async def tts_generator():
+            """Pull sentences from speech_queue, generate TTS audio, push to audio_queue.
+            Runs concurrently with audio_player so sentence N+1 is being fetched
+            from the Edge TTS server while sentence N is already playing."""
+            while True:
+                sentence = await speech_queue.get()
+                speech_queue.task_done()
+                if sentence is None:
+                    await audio_queue.put(None)  # signal end to player
+                    break
+                try:
+                    audio = await generate_tts_audio(sentence)
+                    if audio:
+                        await audio_queue.put(audio)
+                except Exception as e:  # pylint: disable=broad-exception-caught
+                    console.print(f"[red]TTS Generation Error:[/] {e}")
+
+        async def audio_player():
+            """Pull pre-generated audio from audio_queue and play sequentially."""
+            while True:
+                audio = await audio_queue.get()
+                audio_queue.task_done()
+                if audio is None:
+                    break
+                try:
+                    await play_tts_audio(audio)
+                except Exception as e:  # pylint: disable=broad-exception-caught
+                    console.print(f"[red]Playback Error:[/] {e}")
+
+        gen_task = asyncio.create_task(tts_generator())
+        play_task_handle = asyncio.create_task(audio_player())
+        last_spoken_idx = 0
 
         if is_ollama_local:
             import json
@@ -144,6 +182,29 @@ ADDITIONAL CAPABILITIES:
                             response_text += delta
                             display_text = clean_display_text(response_text)
                             live.update(Panel(Markdown(display_text), title="Jarvis", border_style="cyan"))
+
+                            # Only do sentence splitting when this delta contains a sentence terminator
+                            if any(c in delta for c in '.?!\n'):
+                                emotion_match = re.match(r"^(\[Dry\]|\[Sarcastic\]|\[Concerned\]|\[Witty\]|\[Neutral\])", response_text.strip())
+                                emotion_tag = emotion_match.group(1) if emotion_match else ""
+                                pending_text = display_text[last_spoken_idx:]
+                                sentences = re.split(r'(?<=[.?!])\s+|\n+', pending_text)
+                                if sentences:
+                                    ends_with_delimiter = len(pending_text) > 0 and pending_text[-1] in ".?! \n"
+                                    complete_sentences = []
+                                    if ends_with_delimiter:
+                                        complete_sentences = [s.strip() for s in sentences if s.strip()]
+                                        last_spoken_idx += len(pending_text)
+                                    else:
+                                        if len(sentences) > 1:
+                                            complete_sentences = [s.strip() for s in sentences[:-1] if s.strip()]
+                                            consumed_text = pending_text[:-len(sentences[-1])]
+                                            last_spoken_idx += len(consumed_text)
+                                    for s in complete_sentences:
+                                        if emotion_tag:
+                                            speech_queue.put_nowait(f"{emotion_tag} {s}")
+                                        else:
+                                            speech_queue.put_nowait(s)
         else:
             completion = client.chat.completions.create(
                 model=config.LLM_MODEL,
@@ -152,25 +213,89 @@ ADDITIONAL CAPABILITIES:
                 max_tokens=1024,
             )
 
+            # Run the SYNCHRONOUS Groq iterator in a background thread so the asyncio
+            # event loop remains free to execute tts_generator and audio_player concurrently.
+            # Without this, 'for chunk in completion' blocks the event loop, meaning TTS
+            # tasks cannot run until the ENTIRE LLM response finishes — causing the big delay.
+            loop = asyncio.get_running_loop()
+            chunk_q: asyncio.Queue = asyncio.Queue()
+
+            def _sync_groq_stream():
+                try:
+                    for chunk in completion:
+                        if not chunk.choices:
+                            continue
+                        delta = chunk.choices[0].delta
+                        if delta.content:
+                            loop.call_soon_threadsafe(chunk_q.put_nowait, delta.content)
+                except Exception as e:  # pylint: disable=broad-exception-caught
+                    err_msg = str(e)
+                    if "Tool choice is none" not in err_msg:
+                        console.print(f"[red]Stream Error:[/] {e}")
+                finally:
+                    loop.call_soon_threadsafe(chunk_q.put_nowait, None)  # sentinel
+
+            threading.Thread(target=_sync_groq_stream, daemon=True).start()
+
             with Live(console=console, refresh_per_second=12) as live:
-                for chunk in completion:
-                    if chunk.choices[0].delta.content:
-                        delta = chunk.choices[0].delta.content
-                        response_text += delta
-                        display_text = clean_display_text(response_text)
-                        live.update(Panel(Markdown(display_text), title="Jarvis", border_style="cyan"))
+                while True:
+                    delta = await chunk_q.get()  # yields to event loop — TTS tasks run here!
+                    if delta is None:
+                        break
+                    response_text += delta
+                    display_text = clean_display_text(response_text)
+                    config.current_speaking_text = display_text
+                    live.update(Panel(Markdown(display_text), title="Jarvis", border_style="cyan"))
+
+                    # Only do sentence splitting when this delta contains a sentence terminator
+                    if any(c in delta for c in '.?!\n'):
+                        emotion_match = re.match(r"^(\[Dry\]|\[Sarcastic\]|\[Concerned\]|\[Witty\]|\[Neutral\])", response_text.strip())
+                        emotion_tag = emotion_match.group(1) if emotion_match else ""
+                        pending_text = display_text[last_spoken_idx:]
+                        sentences = re.split(r'(?<=[.?!])\s+|\n+', pending_text)
+                        if sentences:
+                            ends_with_delimiter = len(pending_text) > 0 and pending_text[-1] in ".?! \n"
+                            complete_sentences = []
+                            if ends_with_delimiter:
+                                complete_sentences = [s.strip() for s in sentences if s.strip()]
+                                last_spoken_idx += len(pending_text)
+                            else:
+                                if len(sentences) > 1:
+                                    complete_sentences = [s.strip() for s in sentences[:-1] if s.strip()]
+                                    consumed_text = pending_text[:-len(sentences[-1])]
+                                    last_spoken_idx += len(consumed_text)
+                            for s in complete_sentences:
+                                if emotion_tag:
+                                    speech_queue.put_nowait(f"{emotion_tag} {s}")
+                                else:
+                                    speech_queue.put_nowait(s)
 
         # Log assistant response to DB
         log_conversation("assistant", response_text)
 
         if "[IGNORE]" in response_text or "[SKIP]" in response_text:
+            # Stop pipeline
+            await speech_queue.put(None)
+            await gen_task
+            await play_task_handle
             return response_text
 
-        # Speak intermediate/conversational intro immediately before carrying out tasks
+        # Speak any remaining text at the end
         display_text = clean_display_text(response_text)
-        
-        if display_text:
-            await speak_jarvis(display_text)
+        final_pending = display_text[last_spoken_idx:].strip()
+        if final_pending:
+            emotion_match = re.match(r"^(\[Dry\]|\[Sarcastic\]|\[Concerned\]|\[Witty\]|\[Neutral\])", response_text.strip())
+            emotion_tag = emotion_match.group(1) if emotion_match else ""
+            if emotion_tag:
+                speech_queue.put_nowait(f"{emotion_tag} {final_pending}")
+            else:
+                speech_queue.put_nowait(final_pending)
+
+        # Stop pipeline and wait for all audio to finish playing
+        await speech_queue.put(None)
+        await gen_task
+        await play_task_handle
+
 
         # Process internal tags
         # 1. Schedule update
@@ -226,20 +351,38 @@ ADDITIONAL CAPABILITIES:
         if match_exec and depth < 4:
             skill_name = match_exec.group(1).strip()
             
+            # Helper to check if interrupt is a valid, intentional request and not noise
+            def is_valid_interrupt(msg: str, is_voice: bool) -> bool:
+                if not msg or len(msg.strip()) < 2:
+                    return False
+                cleaned = msg.lower().replace(".", "").replace(",", "").strip()
+                if any(cleaned == noise.lower().replace(".", "").replace(",", "") for noise in config.NOISE_WORDS):
+                    return False
+                if is_voice:
+                    from main import is_self_echo
+                    if is_self_echo(msg):
+                        return False
+                    if getattr(config, 'REQUIRE_WAKE_WORD', True):
+                        wake_words = getattr(config, 'WAKE_WORDS', [])
+                        if not any(w.lower() in msg.lower() for w in wake_words):
+                            return False
+                return True
+
             # Check if user has interrupted with a new text/voice query in the middle of execution
             from main import input_queue
             from audio.stt import transcribe_audio
             if not input_queue.empty():
                 input_type, data = input_queue.get_nowait()
                 user_msg = ""
+                is_v = (input_type == "voice")
                 if input_type == "text":
                     user_msg = data
-                elif input_type == "voice":
+                elif is_v:
                     with console.status("[yellow]Processing voice interrupt...[/]"):
                         user_msg = transcribe_audio(data) or ""
                 
-                if user_msg.strip():
-                    console.print(f"[bold red]System:[/] Task interrupted by user input: '{user_msg}'")
+                if is_valid_interrupt(user_msg, is_v):
+                    console.print(f"[bold red]System:[/] Task interrupted by valid user input: '{user_msg}'")
                     if any(word in user_msg.lower() for word in ["stop", "cancel", "no", "exit", "halt"]):
                         await speak_jarvis("Understood sir, aborting the current task.")
                         return "[Task Aborted]"
@@ -247,6 +390,7 @@ ADDITIONAL CAPABILITIES:
                         await speak_jarvis("Aborting the current task to address your new request, sir.")
                         # Reset depth to 0 and process the new query
                         return await get_jarvis_response(user_msg, request_complexity, depth=0)
+
             console.print(f"[bold cyan]System:[/] Executing skill: {skill_name}")
             
             result = await asyncio.to_thread(execute_skill, skill_name)
@@ -257,13 +401,14 @@ ADDITIONAL CAPABILITIES:
                 if not input_queue.empty():
                     input_type, data = input_queue.get_nowait()
                     user_msg = ""
+                    is_v = (input_type == "voice")
                     if input_type == "text":
                         user_msg = data
-                    elif input_type == "voice":
+                    elif is_v:
                         with console.status("[yellow]Processing voice interrupt...[/]"):
                             user_msg = transcribe_audio(data) or ""
-                    if user_msg.strip():
-                        console.print(f"[bold red]System:[/] Task interrupted by user input: '{user_msg}'")
+                    if is_valid_interrupt(user_msg, is_v):
+                        console.print(f"[bold red]System:[/] Task interrupted by valid user input: '{user_msg}'")
                         if any(word in user_msg.lower() for word in ["stop", "cancel", "no", "exit", "halt"]):
                             await speak_jarvis("Understood sir, aborting the current task.")
                             return "[Task Aborted]"
