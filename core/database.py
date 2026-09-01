@@ -1,8 +1,23 @@
 import sqlite3
+import threading
 import time
 from typing import List, Tuple
 
 DB_PATH = "jarvis.db"
+
+# Persistent per-thread connection pool.
+# All asyncio coroutines run on the main thread, so they share one connection.
+# Background threads (via asyncio.to_thread) get their own connection.
+_local = threading.local()
+
+def _get_conn() -> sqlite3.Connection:
+    """Return a reusable per-thread SQLite connection with WAL mode enabled."""
+    if not hasattr(_local, 'conn') or _local.conn is None:
+        conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+        conn.execute("PRAGMA journal_mode=WAL")   # allow concurrent reads
+        conn.execute("PRAGMA synchronous=NORMAL")  # safe but faster than FULL
+        _local.conn = conn
+    return _local.conn
 
 def init_db():
     """Initialize SQLite database and create tables if not exists"""
@@ -71,18 +86,17 @@ def init_db():
 
 def log_conversation(role: str, content: str):
     """Log a conversation message"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = _get_conn()
     cursor = conn.cursor()
     cursor.execute(
         "INSERT INTO conversations (timestamp, role, content) VALUES (?, ?, ?)",
         (time.time(), role, content)
     )
     conn.commit()
-    conn.close()
 
 def add_memory(category: str, content: str):
     """Add a new memory"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = _get_conn()
     cursor = conn.cursor()
     timestamp = time.time()
     cursor.execute(
@@ -97,37 +111,30 @@ def add_memory(category: str, content: str):
     except sqlite3.OperationalError:
         pass
     conn.commit()
-    conn.close()
 
 def search_memories(query: str, limit: int = 5) -> List[Tuple[str, str]]:
     """Search stored memories using FTS5 (with OR keyword expansion) or LIKE query"""
     import re
-    conn = sqlite3.connect(DB_PATH)
+    conn = _get_conn()
     cursor = conn.cursor()
-    
+
     # Extract clean words, ignoring short words (stop words)
     words = [re.sub(r'[^a-zA-Z0-9]', '', w) for w in query.split()]
     words = [w for w in words if len(w) > 2]
-    
+
     if not words:
-        # Default: return recent memories if query is too short
         cursor.execute("SELECT category, content FROM memories ORDER BY id DESC LIMIT ?", (limit,))
-        results = cursor.fetchall()
-        conn.close()
-        return results
+        return cursor.fetchall()
 
     # Build OR match for FTS5 (e.g., "word1* OR word2*")
     fts_query = " OR ".join([f"{w}*" for w in words])
-    results = []
     try:
-        # Try FTS5 match
         cursor.execute(
             "SELECT category, content FROM memories_fts WHERE memories_fts MATCH ? LIMIT ?",
             (fts_query, limit)
         )
-        results = cursor.fetchall()
+        return cursor.fetchall()
     except sqlite3.OperationalError:
-        # Fallback to LIKE query
         like_clauses = " OR ".join(["content LIKE ? OR category LIKE ?" for _ in words])
         params = []
         for w in words:
@@ -137,26 +144,23 @@ def search_memories(query: str, limit: int = 5) -> List[Tuple[str, str]]:
             f"SELECT category, content FROM memories WHERE {like_clauses} LIMIT ?",
             params
         )
-        results = cursor.fetchall()
-    conn.close()
-    return results
+        return cursor.fetchall()
 
 def get_recent_conversations(limit: int = 6) -> List[Tuple[str, str]]:
     """Retrieve recent conversation logs"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = _get_conn()
     cursor = conn.cursor()
     cursor.execute(
         "SELECT role, content FROM conversations ORDER BY id DESC LIMIT ?",
         (limit,)
     )
     rows = cursor.fetchall()
-    conn.close()
     # Reverse to keep chronological order
     return rows[::-1]
 
 def get_db_stats() -> Tuple[int, int, int]:
     """Return count of memories, conversations, and skills in database"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = _get_conn()
     cursor = conn.cursor()
     try:
         cursor.execute("SELECT count(*) FROM memories")
@@ -167,20 +171,17 @@ def get_db_stats() -> Tuple[int, int, int]:
         skills_count = cursor.fetchone()[0]
     except Exception:
         mem_count, conv_count, skills_count = 0, 0, 0
-    conn.close()
     return mem_count, conv_count, skills_count
 
 def get_all_skills() -> List[Tuple[str, str]]:
     """Retrieve all registered skills (name, description)"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = _get_conn()
     cursor = conn.cursor()
     try:
         cursor.execute("SELECT name, description FROM skills")
-        rows = cursor.fetchall()
+        return cursor.fetchall()
     except Exception:
-        rows = []
-    conn.close()
-    return rows
+        return []
 
 # Initialize db when this module is imported
 init_db()

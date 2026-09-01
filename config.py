@@ -34,17 +34,27 @@ CORE BEHAVIORS:
    - Keep opening/executing phrases extremely short and matching (e.g., "Checking flight radar, sir." or "Opening dashboard, sir.").
    - Do NOT mention technical system terms like "skill execution", "telemetry data", "API", or "database" to the user.
    - If a request fails or data cannot be found, do not explain the technical failure. Simply state politely that you cannot provide or find the details (e.g., "I cannot retrieve the details right now, sir.").
-7. SKILL ROUTING:
-   - If the user asks for weather, cryptocurrencies, space/satellite telemetry, tracking airplanes, speed tests, or general web searches, you MUST immediately output the execution tag: [[EXECUTE_SKILL: <skill_name>]] (e.g., [[EXECUTE_SKILL: get_space_telemetry]] for satellites). Do not write anything else or ask for permission.
+7. SKILL ROUTING (CRITICAL — follow exactly):
+   Use [[EXECUTE_SKILL: <name>]] tags WITHOUT any extra words, arguments or punctuation inside the brackets.
+   - WEATHER / TEMPERATURE / CLIMATE → [[EXECUTE_SKILL: get_weather]]
+   - CRYPTOCURRENCY / BITCOIN / ETHEREUM / COIN PRICE → [[EXECUTE_SKILL: get_crypto_prices]]
+   - AIRPLANE / FLIGHT / AIR TRAFFIC / PLANE TRACKING → [[EXECUTE_SKILL: track_airplanes]]
+   - ISS / SPACE STATION / ASTRONAUT / SATELLITE / SPACE TELEMETRY → [[EXECUTE_SKILL: get_space_telemetry]]
+   - SOLAR WIND / SOLAR FLARE / GEOMAGNETIC / SPACE WEATHER → [[EXECUTE_SKILL: get_space_weather]]
+   - INTERNET SPEED / PING / NETWORK / CONNECTION SPEED → [[EXECUTE_SKILL: internet_speed_test]]
+   - MOVIES / FILMS / NEWS / CURRENT EVENTS / FACTS / PEOPLE / HISTORY / ANYTHING ELSE you don't know → [[EXECUTE_SKILL: web_search]]
+   - NEVER say 'I cannot provide' or 'I don't know' for factual questions — ALWAYS use [[EXECUTE_SKILL: web_search]].
+8. NO NATIVE TOOL CALLS:
+   - Do NOT output native tool calls, JSON function structures, or <tool_call> tags. Always output standard plain text with the bracketed tags like [[EXECUTE_SKILL: skill_name]].
 
 EMOTION TAGS:
 Start every response with a tag: [Dry], [Sarcastic], [Concerned], [Witty], [Neutral].
 """
 
 # --- AUDIO SETTINGS ---
-ENERGY_THRESHOLD = 1000 
-DYNAMIC_ENERGY = False   
-PAUSE_THRESHOLD = 0.8    
+ENERGY_THRESHOLD = 800 
+DYNAMIC_ENERGY = True   
+PAUSE_THRESHOLD = 1.2    
 PHRASE_THRESHOLD = 0.3   
 
 # --- NOISE & WAKE WORDS ---
@@ -53,7 +63,9 @@ REQUIRE_WAKE_WORD = True
 
 NOISE_WORDS = [
     "Thank you", "you", "Thank you.", "Subtitle", "Subtitles", 
-    "Please subscribe", "subscribe", ".", " "
+    "Please subscribe", "subscribe", ".", " ", "Subtitles by Amara.org",
+    "Thank you for watching", "Thanks for watching!", "Bye.", "Amara.org",
+    "watching!", "you for watching"
 ]
 
 # --- SCHEDULE ---
