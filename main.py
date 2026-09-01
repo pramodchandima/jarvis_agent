@@ -83,19 +83,73 @@ async def dashboard_data_writer_task():
     from tools.space_dashboard_manager import update_space_data
     while True:
         try:
-            update_dashboard_data()
+            await asyncio.to_thread(update_dashboard_data)
         except Exception:
             pass
         try:
-            update_space_data()
+            await asyncio.to_thread(update_space_data)
         except Exception:
             pass
         try:
-            await asyncio.sleep(1)
+            await asyncio.sleep(2)
         except asyncio.CancelledError:
             break
         except Exception:
-            await asyncio.sleep(1)
+            await asyncio.sleep(2)
+
+def is_self_echo(user_text: str) -> bool:
+    """Check if transcribed voice is an echo of Jarvis's own speech from speakers."""
+    import time
+    is_speaking = getattr(config, 'is_speaking', False)
+    last_speak_time = getattr(config, 'last_speak_time', 0.0)
+    time_since_speech = time.time() - last_speak_time
+
+    clean_user = re.sub(r"[^\w\s]", "", user_text.lower()).strip()
+    if not clean_user:
+        return True
+
+    # 1. ALWAYS check text similarity against recent assistant responses + active speech
+    assistant_texts = ["online and ready sir"]
+    active_speech = getattr(config, 'current_speaking_text', '')
+    if active_speech:
+        cleaned_active = re.sub(r"[^\w\s]", "", active_speech.lower()).strip()
+        if cleaned_active:
+            assistant_texts.append(cleaned_active)
+
+    try:
+        from ai.llm import messages
+        from core.text_utils import clean_display_text
+        for msg in reversed(messages):
+            if msg["role"] == "assistant":
+                cleaned_ast = re.sub(r"[^\w\s]", "", clean_display_text(msg["content"]).lower()).strip()
+                if cleaned_ast:
+                    assistant_texts.append(cleaned_ast)
+                if len(assistant_texts) >= 10:
+                    break
+    except Exception:
+        pass
+
+    for ast_text in assistant_texts:
+        if not ast_text:
+            continue
+        # If transcribed voice is a substring of assistant speech or vice-versa
+        if clean_user in ast_text or ast_text in clean_user:
+            return True
+        # Check word overlap ratio (> 25% match with any recent Jarvis utterance means echo!)
+        user_words = set(clean_user.split())
+        ast_words = set(ast_text.split())
+        if user_words and ast_words:
+            overlap = len(user_words.intersection(ast_words)) / len(user_words)
+            if overlap >= 0.25:
+                return True
+
+    # 2. If recorded while speaking or within 5.0 seconds of speech ending, strictly require explicit interrupt command
+    if is_speaking or time_since_speech < 5.0:
+        strict_interrupt_keywords = ["stop", "cancel", "halt", "pause", "quiet", "shut up", "jarvis stop"]
+        if not any(kw in clean_user for kw in strict_interrupt_keywords):
+            return True  # Treat as self-echo and ignore
+
+    return False
 
 async def main():
     """Main program loop with intelligent request handling"""
@@ -137,15 +191,9 @@ async def main():
 
     # Define background audio listener callback
     def audio_callback(rec, audio):
-        # Only queue voice if Jarvis is not actively speaking or processing
-        is_speaking = getattr(config, 'is_speaking', False) or jarvis_is_speaking
-        last_speak_time = getattr(config, 'last_speak_time', 0.0)
-        import time
-        
-        # Discard audio if speaking now, or if it has been less than 1.5 seconds since speech finished
-        if is_speaking or (time.time() - last_speak_time < 1.5):
-            return
-            
+        # Drop older unprocessed audio packets so we always take the latest speech immediately
+        with input_queue.mutex:
+            input_queue.queue.clear()
         input_queue.put(("voice", audio))
 
     stop_listening = None
@@ -173,26 +221,35 @@ async def main():
             user_text_str = ""
 
             if input_type == "text":
+                from audio.tts import stop_tts
+                stop_tts()
                 user_text_str = data
                 console.print(f"\n[bold green]Sir (Typed):[/] {user_text_str}")
             elif input_type == "voice":
-                # Double check to prevent late-arriving packets from being processed during speech
-                if jarvis_is_speaking:
-                    continue
-
+                # Transcribe speech first to check for validity before interrupting current actions
                 with console.status("[yellow]Processing voice...[/]"):
                     user_text = transcribe_audio(data)
 
                 if not user_text or len(str(user_text).strip()) < 2:
                     continue
+
                 user_text_str = str(user_text).strip()
-            # Set flag to True to temporarily block background audio queueing
-            jarvis_is_speaking = True
 
-            # INTELLIGENT REQUEST ANALYSIS PHASE
-            request_complexity, _ = analyze_request_complexity(user_text_str)
+                # SELF-ECHO FILTERING - Ignore mic picking up Jarvis's own speakers
+                if is_self_echo(user_text_str):
+                    continue
 
-            # Wake word and session checking
+                # NOISE FILTERING - Check if input is background noise or unwanted phrase
+                cleaned_text = user_text_str.lower().replace(".", "").replace(",", "")
+                is_noise = any(
+                    cleaned_text == noise.lower().replace(".", "").replace(",", "")
+                    for noise in config.NOISE_WORDS
+                )
+
+                if is_noise:
+                    continue
+
+            # Wake word and session checking BEFORE interrupting or setting jarvis_is_speaking
             wake_words = getattr(config, 'WAKE_WORDS', [])
             is_addressed = any(word.lower() in user_text_str.lower() for word in wake_words)
 
@@ -213,23 +270,19 @@ async def main():
             )
 
             if not should_process:
-                jarvis_is_speaking = False
                 continue
 
-            # NOISE FILTERING
-            cleaned_text = user_text_str.lower().replace(".", "").replace(",", "")
-            is_noise = any(
-                cleaned_text == noise.lower().replace(".", "").replace(",", "")
-                for noise in config.NOISE_WORDS
-            )
-
-            if is_noise:
-                jarvis_is_speaking = False
-                continue
-
-            # Print user speech only after it passes wake-word and noise filters
+            # ONLY IF valid speech passed noise and wake-word checks: interrupt current TTS speech now!
             if input_type == "voice":
+                from audio.tts import stop_tts
+                stop_tts()
                 console.print(f"\n[bold green]Sir (Spoken):[/] {user_text_str}")
+
+            # Set flag to True to block background audio queueing during processing
+            jarvis_is_speaking = True
+
+            # INTELLIGENT REQUEST ANALYSIS PHASE
+            request_complexity, _ = analyze_request_complexity(user_text_str)
 
             # AI RESPONSE PHASE (handles intermediate & final speech internally)
             response = await get_jarvis_response(user_text_str, request_complexity)
