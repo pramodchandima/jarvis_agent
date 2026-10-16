@@ -6,6 +6,11 @@ except ImportError:
     class config:  # pylint: disable=invalid-name
         """Fallback configuration if config.py is missing"""
         GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+        GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", os.getenv("GOOGLE_API_KEY"))
+        AI_PROVIDER = os.getenv("AI_PROVIDER", "groq").lower()
+        GEMINI_AUDIO_MODEL = os.getenv("GEMINI_AUDIO_MODEL", "gemini-2.5-flash-native-audio-latest")
+        GEMINI_VOICE = os.getenv("GEMINI_VOICE", "Puck")
+        GEMINI_MIC_DEVICE_INDEX = os.getenv("GEMINI_MIC_DEVICE_INDEX")
         LLM_MODEL = "llama-3.3-70b-versatile"
         TRANSCRIPTION_MODEL = "whisper-large-v3-turbo"
         JARVIS_VOICE = "en-GB-RyanNeural"

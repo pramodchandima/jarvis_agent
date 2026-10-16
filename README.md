@@ -76,26 +76,39 @@ A real-time global intelligence HUD featuring:
 git clone https://github.com/pramodchandima/jarvis-agent.git
 cd jarvis-agent
 
-# 2. Install dependencies
+# 2. Install dependencies (Python 3.10 - 3.12 recommended)
 pip install -r requirements.txt
 
 # 3. Configure secrets
 copy .env.example .env
 # Then edit .env with your API keys
 
-# 4. Run
+# 4. Run JARVIS
+# On Windows, you can double-click or run the batch launcher:
+.\run_jarvis.bat
+
+# Or run via Python:
 python main.py
 ```
 
 ### `.env` Configuration
 
+JARVIS supports switching between Google's **Gemini 2.5 Flash Native Audio Dialog** and the traditional **Groq + Edge-TTS** engine:
+
 ```env
+# Choose Engine: "gemini" or "groq"
+AI_PROVIDER=gemini
+
+# Gemini Native Audio Settings (Zero-lag voice dialog)
+GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_AUDIO_MODEL=gemini-2.5-flash-native-audio-latest
+GEMINI_VOICE=Puck
+
+# Groq / Local LLM Settings
 GROQ_API_KEY=your_groq_api_key_here
 GOOGLE_API_KEY=your_google_api_key_here
-
-# Optional overrides:
-# LLM_MODEL=llama-3.3-70b-versatile
-# TRANSCRIPTION_MODEL=whisper-large-v3-turbo
+LLM_MODEL=llama-3.3-70b-versatile
+TRANSCRIPTION_MODEL=whisper-large-v3-turbo
 ```
 
 ---

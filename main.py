@@ -20,6 +20,7 @@ from audio.stt import transcribe_audio
 from audio.music_player import stop_music
 from ai.intent_analyzer import analyze_request_complexity
 from ai.llm import get_jarvis_response, messages, client
+from ai.gemini_audio import LiveSessionConnectionLost, run_gemini_live_session
 from tools.reminder_scheduler import start_reminder_scheduler
 
 # Initialize Pygame Mixer at the root
@@ -143,9 +144,9 @@ def is_self_echo(user_text: str) -> bool:
             if overlap >= 0.25:
                 return True
 
-    # 2. If recorded while speaking or within 5.0 seconds of speech ending, strictly require explicit interrupt command
-    if is_speaking or time_since_speech < 5.0:
-        strict_interrupt_keywords = ["stop", "cancel", "halt", "pause", "quiet", "shut up", "jarvis stop"]
+    # 2. Only during active speaking, reject background noise unless it is a command directed to Jarvis or interrupt
+    if is_speaking:
+        strict_interrupt_keywords = ["stop", "cancel", "halt", "pause", "quiet", "shut up", "jarvis", "sir"]
         if not any(kw in clean_user for kw in strict_interrupt_keywords):
             return True  # Treat as self-echo and ignore
 
@@ -156,6 +157,42 @@ async def main():
     global jarvis_is_speaking
     
     show_startup_banner()
+
+    ai_provider = getattr(config, 'AI_PROVIDER', 'groq').lower()
+
+    if ai_provider == "gemini":
+        console.print("[bold green]System:[/] Keyboard listener active. [bold cyan]Gemini Live Voice Active[/].")
+        console.print("[bold white]Note:[/] You can speak or type at any time. To type, just type your query and press Enter.\n")
+        threading.Thread(target=console_input_thread, daemon=True).start()
+
+        scheduler_task = asyncio.create_task(start_reminder_scheduler())
+        dashboard_updater = asyncio.create_task(dashboard_data_writer_task())
+        try:
+            for reconnect_attempt in range(1, 4):
+                try:
+                    await run_gemini_live_session(input_queue)
+                    break
+                except LiveSessionConnectionLost as error:
+                    if reconnect_attempt == 3:
+                        raise RuntimeError("Gemini Live disconnected repeatedly.") from error
+                    console.print(
+                        f"[yellow]Gemini Live:[/] Connection lost ({error}). "
+                        f"Reconnecting ({reconnect_attempt}/3)..."
+                    )
+                    await asyncio.sleep(1)
+        except KeyboardInterrupt:
+            console.print("\n[cyan]Jarvis:[/] Powering down. Have a pleasant day, sir.")
+        except Exception as error:  # pylint: disable=broad-exception-caught
+            console.print(f"[bold red]Gemini Live Error:[/] {error}")
+            await speak_jarvis("Sir, the live voice connection failed.")
+        finally:
+            scheduler_task.cancel()
+            dashboard_updater.cancel()
+            await asyncio.gather(scheduler_task, dashboard_updater, return_exceptions=True)
+            stop_music()
+            from tools.dashboard_manager import hide_dashboard
+            hide_dashboard()
+        return
 
     # Initialize speech recognition elements
     recognizer = sr.Recognizer()
@@ -185,30 +222,27 @@ async def main():
     console.print("[bold white]Note:[/] You can speak or type at any time. To type, just type your query and press Enter.\n")
     threading.Thread(target=console_input_thread, daemon=True).start()
 
-    # Play greeting immediately so user gets feedback instantly
-    greeting = "Online and ready, sir."
-    await speak_jarvis(greeting)
+    # Start the proactive background reminder scheduler
+    scheduler_task = asyncio.create_task(start_reminder_scheduler())
+    # Start background dashboard updater
+    dashboard_updater = asyncio.create_task(dashboard_data_writer_task())
 
-    # Define background audio listener callback
+    # --- AUDIO LISTENER CALLBACK ---
     def audio_callback(rec, audio):
-        # Drop older unprocessed audio packets so we always take the latest speech immediately
         with input_queue.mutex:
             input_queue.queue.clear()
         input_queue.put(("voice", audio))
 
     stop_listening = None
     if has_mic and microphone:
-        # Calibrate to ambient noise to set the threshold dynamically above background noise
         with console.status("[yellow]Calibrating microphone to room noise...[/]"):
             with microphone as source:
-                recognizer.adjust_for_ambient_noise(source, duration=1.0)
-        # Start listening in background (runs continuously)
+                recognizer.adjust_for_ambient_noise(source, duration=0.5)
         stop_listening = recognizer.listen_in_background(microphone, audio_callback)
 
-    # Start the proactive background reminder scheduler
-    scheduler_task = asyncio.create_task(start_reminder_scheduler())
-    # Start background dashboard updater
-    dashboard_updater = asyncio.create_task(dashboard_data_writer_task())
+    # Play greeting immediately
+    greeting = "Online and ready, sir."
+    await speak_jarvis(greeting)
 
     while True:
         try:
@@ -291,8 +325,12 @@ async def main():
                 jarvis_is_speaking = False
                 continue
 
-            # Finished speaking and processing (handled inside get_jarvis_response)
+            # Finished speaking and processing
             jarvis_is_speaking = False
+
+            # Flush any microphone packets that leaked in while Jarvis was speaking
+            with input_queue.mutex:
+                input_queue.queue.clear()
 
         except KeyboardInterrupt:
             closing = "Powering down. Have a pleasant day, sir."

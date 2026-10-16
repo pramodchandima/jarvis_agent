@@ -45,20 +45,16 @@ def show_startup_banner() -> None:
         mic_ok = False
     voice_status = ("READY" if mic_ok else "NO MIC", "READY" if mic_ok else "[bold red]NO MIC FOUND[/]")
 
-    # 4. GROQ CLOUD LINK
-    try:
-        socket.setdefaulttimeout(1.2)
-        socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect(("api.groq.com", 443))
-        network_ok = True
-    except Exception:
-        network_ok = False
-    link_status = ("CONNECTED" if network_ok else "OFFLINE", "CONNECTED" if network_ok else "[bold red]OFFLINE[/]")
+    # 4. ACTIVE AI ENGINE
+    active_provider = getattr(config, 'AI_PROVIDER', 'groq').lower()
+    if active_provider == "gemini":
+        has_gemini_key = bool(getattr(config, 'GEMINI_API_KEY', None) or getattr(config, 'GOOGLE_API_KEY', None))
+        ai_status = ("GEMINI 2.5 NATIVE", "[bold cyan]GEMINI 2.5 NATIVE AUDIO[/]" if has_gemini_key else "[bold red]GEMINI KEY MISSING[/]")
+    else:
+        has_groq_key = bool(config.GROQ_API_KEY)
+        ai_status = ("GROQ + EDGE-TTS", "[bold magenta]GROQ + EDGE-TTS[/]" if has_groq_key else "[bold red]GROQ KEY MISSING[/]")
 
-    # 5. SMART ANALYSIS ENGINE
-    has_key = bool(config.GROQ_API_KEY)
-    engine_status = ("LOADED" if has_key else "KEY MISSING", "LOADED" if has_key else "[bold red]KEY MISSING[/]")
-
-    # 6. SCHEDULE MODULE
+    # 5. SCHEDULE MODULE
     sched_path = getattr(config, 'SCHEDULE_FILE', "schedule.txt")
     has_sched = os.path.exists(sched_path)
     sched_status = ("LOADED" if has_sched else "FILE MISSING", "LOADED" if has_sched else "[bold yellow]FILE MISSING[/]")
@@ -67,8 +63,7 @@ def show_startup_banner() -> None:
         ("CORE PROCESSORS", cpu_status),
         ("NEURAL NETWORK", nn_status),
         ("VOICE RECOGNITION", voice_status),
-        ("GROQ CLOUD LINK", link_status),
-        ("SMART ANALYSIS ENGINE", engine_status),
+        ("ACTIVE AI ENGINE", ai_status),
         ("SCHEDULE MODULE", sched_status),
     ]
 

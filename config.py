@@ -6,10 +6,19 @@ load_dotenv()
 # --- API KEYS ---
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GROQ_BASE_URL = os.getenv("GROQ_BASE_URL")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", os.getenv("GOOGLE_API_KEY"))
 
-# --- MODEL SETTINGS ---
+# --- PROVIDER & MODEL SETTINGS ---
+# Set AI_PROVIDER to "gemini" for Gemini 2.5 Flash Native Audio Dialog, or "groq" for traditional Groq + Whisper + Edge-TTS
+AI_PROVIDER = os.getenv("AI_PROVIDER", "groq").lower()
+
 LLM_MODEL = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")
 TRANSCRIPTION_MODEL = os.getenv("TRANSCRIPTION_MODEL", "whisper-large-v3-turbo")
+
+# Gemini 2.5 Flash Native Audio Dialog settings
+GEMINI_AUDIO_MODEL = os.getenv("GEMINI_AUDIO_MODEL", "gemini-2.5-flash-native-audio-latest")
+GEMINI_VOICE = os.getenv("GEMINI_VOICE", "Puck")  # Options: Puck, Charon, Kore, Fenrir, Aoede, etc.
+GEMINI_MIC_DEVICE_INDEX = os.getenv("GEMINI_MIC_DEVICE_INDEX")
 
 # --- VOICE SETTINGS ---
 JARVIS_VOICE = "en-GB-RyanNeural"
@@ -54,8 +63,8 @@ Start every response with a tag: [Dry], [Sarcastic], [Concerned], [Witty], [Neut
 # --- AUDIO SETTINGS ---
 ENERGY_THRESHOLD = 800 
 DYNAMIC_ENERGY = True   
-PAUSE_THRESHOLD = 1.2    
-PHRASE_THRESHOLD = 0.3   
+PAUSE_THRESHOLD = 0.6    # Reduced from 1.2s to 0.6s for lightning-fast voice response
+PHRASE_THRESHOLD = 0.2   
 
 # --- NOISE & WAKE WORDS ---
 WAKE_WORDS = ["jarvis", "sir"]
